@@ -22,7 +22,8 @@ git clone https://github.com/isblab/disobind.git
 ```
 
 
-2. Set up the repository
+2. Set up the repository  
+
 Run the following commands in order:
 ```
 cd Disobind/
