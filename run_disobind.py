@@ -59,7 +59,7 @@ class Disobind():
 		# Use global/local embeddings.
 		self.scope = "global"
 		# Device to be used for running Disobind.
-		self.device = "cuda" # cpu/cuda.
+		self.device = args.d
 		# Max protein length.
 		self.max_len = 100
 		# Contact probability threshold.
@@ -746,9 +746,14 @@ if __name__ == "__main__":
 						type = int, required = False, default = 2 )
 
 	parser.add_argument( 
-						"--max_output_dir", "-o", dest = "o", 
+						"--output_dir", "-o", dest = "o", 
 						help = "Name of the output directory.", 
 						type = str, required = False, default = "output" )
+
+	parser.add_argument( 
+						"--device", "-d", dest = "d", 
+						help = "Device to be used (cpu/cuda.", 
+						type = str, required = False, default = "cpu" )
 
 	parser.add_argument( 
 						"--cmaps", "-cm", dest = "cm", 
