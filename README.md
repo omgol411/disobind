@@ -26,7 +26,7 @@ git clone https://github.com/isblab/disobind.git
 
 Run the following commands in order:
 ```
-cd Disobind/
+cd disobind/
 chmod +x install.sh
 ./install.sh
 ```
