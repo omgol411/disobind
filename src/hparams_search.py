@@ -12,8 +12,8 @@ import os
 import time
 import joblib
 
-import optuna
-from optuna.trial import TrialState
+# import optuna
+# from optuna.trial import TrialState
 
 import torch
 from torch import nn
@@ -41,7 +41,7 @@ parser.add_argument('--Version_file', '-f', dest="f",
 					help="*.yml file containing the parameters and hyperparameters for the model", 
 					required = True )
 parser.add_argument('--mode', '-m', dest="m", 
-					help="(optuna/manual) mode optuna/ manual search for hparam tuning", 
+					help="manual/optuna -- optuna has been deprecated.", 
 					required = True )
 version = parser.parse_args().f
 
