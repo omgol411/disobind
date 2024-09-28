@@ -91,7 +91,7 @@ Disobind analysis occurs in 3 steps:
 2. Get AF2/AF3 predictions on the OOD set.
 3. Perform analysis (calculate metrics on OOD, create calibration plots, etc.) using Disobind and AF2/AF3 predictions.
 
-## Disobind predictions
+### Disobind predictions
 Run the following script on the terminal:
 ```
 python predict.py
@@ -109,7 +109,7 @@ This script creates a dict containing the following outputs for all tasks (conta
 9. Binary mask for ALiMs in prot2.
 
 
-## AF2/AF3 predictions
+### AF2/AF3 predictions
 Run the following script on the terminal, specify `self.af_model` in the constructor:
 ```
 python get_af_prediction.py
@@ -123,7 +123,7 @@ This script creates a dict containing the following outputs for all tasks (conta
 For all OOD set entries, predicted contact maps are zeroed if the ipTM <= 0.75.  
 
 
-## Perform analysis
+### Perform analysis
 Run the following script on the terminal:
 ```
 python analysis.py
