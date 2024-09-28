@@ -1,11 +1,13 @@
-############ Running the model with specified configurations ############
-############# ------>"May the Force serve u well..." <------#############
-#########################################################################
+############ Creating employment for another downstream script ###########
+## U can think of it as running the model with specified configurations ##
+############# ------>"May the Force serve u well..." <------##############
+##########################################################################
 
 ############# One above all #############
 ##-------------------------------------##
 import numpy as np
 import time
+import random
 from sklearn.linear_model import LogisticRegression
 from sklearn.isotonic import IsotonicRegression
 from betacal import BetaCalibration
@@ -24,7 +26,6 @@ class Trainer (nn.Module):
 	def __init__ (self, config, device):
 		super(Trainer, self).__init__()
 		self.objective = config.objective
-		# Embedding used for input sequence.
 		self.emb_type = config.emb
 		self.optim = config.optimizer
 		self.amsgrad = config.amsgrad
@@ -47,16 +48,12 @@ class Trainer (nn.Module):
 
 	def optimizer( self ):
 		if self.optim == "Adam":
-			print( "Using Adam optimizer..." )
 			return torch.optim.Adam( self.model1.parameters(), lr = self.lr, weight_decay = self.wd, amsgrad = self.amsgrad )
 		
 		elif self.optim == "SGD":
-			print( "Using SGD optimizer..." )
 			return torch.optim.SGD( self.model1.parameters(), lr = self.lr, weight_decay = self.wd, momentum = 0.9 )
 		
 		elif self.optim == "AdamW":
-			print( f"Weight decay = {self.wd} \t Amsgrad = {self.amsgrad}" )
-			print( "Using AdamW optimizer..." )
 			return torch.optim.AdamW( self.model1.parameters(), lr = self.lr, weight_decay = self.wd, amsgrad = self.amsgrad )
 
 
@@ -92,8 +89,8 @@ class Trainer (nn.Module):
 				end = self.scheduler_config.end_factor
 				total_iters = self.scheduler_config.total_iters
 				scheduler = torch.optim.lr_scheduler.LinearLR( optimizer, start_factor = start, 
-																				end_factor = end, 
-																				total_iters = total_iters )
+																end_factor = end, 
+																total_iters = total_iters )
 
 		else:
 			print( "Not using any scheduler.." )
@@ -169,7 +166,7 @@ class Trainer (nn.Module):
 		target_mask --> binary mask for ignoring contribution from padding.
 		"""
 		p1_emb, p2_emb, target, target_mask = self.get_inputs( batch )
-		
+
 		preds = self.model1( p1_emb, p2_emb )
 
 		del p1_emb, p2_emb
@@ -178,7 +175,7 @@ class Trainer (nn.Module):
 
 	def calculate_loss_n_metrics( self, preds, target, target_mask, train = False ):
 		"""
-		Perform forward pass.
+		Calculate loss and evaluation metrocs.
 
 		Input:
 		----------
@@ -195,38 +192,21 @@ class Trainer (nn.Module):
 		target --> target for the minibatch.
 		target_mask --> binary mask for ignoring contribution from padding.
 		"""
-		# if self.loss == "conf_loss":
-		# 	preds = preds*confidence + ( 1 - confidence )*target.reshape( len( target ), 1 )
-			
-		# 	loss = self.loss_func.forward( [preds, confidence], target, 
-		# 										self.device, self.weight )
-
-		# elif self.loss == "bce_mse":
-		# 	loss = self.loss_func.forward( [ preds, confidence ], target, self.device, self.weight )
-		# 	metrics = torch_metrics( preds, target, self.threshold, self.multidim_avg, self.device )
-
-		# elif self.loss == "correction_loss":
-		# 	loss = self.loss_func.forward( preds, target, self.device, self.weight )
-		# 	preds, _ = preds
-
-		# elif self.loss == "count_reg_loss":
-		# 	loss = self.loss_func.forward( preds, target, self.device, self.threshold, self.weight )
-		# 	preds = preds[0]
-
-		# elif self.loss == "inverse_loss":
-		# 	loss = self.loss_func.forward( preds, target, self.device )
-		# 	preds = preds[0]
-
-		# else:
 		loss = self.loss_func.forward( preds, target, 
 											self.device, self.weight, [self.mask[1], target_mask] )
 
 		if self.loss in ["bce_with_logits", "representation_loss"]:
 			preds = torch.sigmoid( preds )
 
+		elif self.loss == "interface":
+			preds = torch.cat( preds, axis = 1 )
+			target_mask = torch.cat( target_mask, axis = 1 )
+			target = torch.cat( target, axis = 1 )
+
 		if self.mask[1]:
 			preds = preds*target_mask
 		metrics = torch_metrics( preds, target, self.threshold, self.multidim_avg, self.device )
+
 
 		preds = preds.detach().cpu().numpy()
 		target = target.detach().cpu().numpy()
@@ -288,7 +268,7 @@ class Trainer (nn.Module):
 					mask = np.concatenate( ( mask, train_mask.detach().cpu().numpy() ), axis = 0 )
 
 			if self.max_norm != None:
-				torch.nn.utils.clip_grad_norm_( self.model1.parameters(), max_norm = self.max_norm )
+				torch.nn.utils.clip_grad_norm_( self.model1.parameters(), max_norm = 1 )
 
 			# Update params for every batch.
 			self.optimizer1.step()
@@ -306,9 +286,11 @@ class Trainer (nn.Module):
 			uncal_preds = uncal_preds.flatten()
 			target = target.flatten()
 			mask = mask.flatten()
-			self.calibrate_model( uncal_preds*mask, target*mask )
+			cal_model = self.calibrate_model( uncal_preds*mask, target*mask )
+				
 
 		return batch_dict
+
 
 
 	def calibrate_model( self, preds, target ):
@@ -317,7 +299,6 @@ class Trainer (nn.Module):
 		"""
 		if self.method == "platt":
 			print( "Using Platt scaling..." )
-			# print( preds.shape, "  ", target.shape )
 			self.cal_model = LogisticRegression()
 			self.cal_model.fit( preds.reshape( -1, 1 ), target.reshape( -1, 1 ) )
 
@@ -419,7 +400,6 @@ class Trainer (nn.Module):
 		print("Predicting for Test set")
 		##############------------------##############
 		batch_dict = np.array( [] )
-		# test_save, target_save = [], []
 
 		uncal_preds, cal_preds = [], []
 
@@ -455,7 +435,6 @@ class Trainer (nn.Module):
 				test_pred = torch.from_numpy( test_pred ).to( self.device )
 				test_target = torch.from_numpy( test_target ).to( self.device )
 				test_mask = torch.from_numpy( test_mask ).to( self.device )
-
 
 				_, test_metrics, test_pred, test_target, test_mask = self.calculate_loss_n_metrics( test_pred, test_target, test_mask )
 
@@ -550,14 +529,13 @@ class Trainer (nn.Module):
 			self.model1.eval()
 			dev_batch_dict = self.validation_step( dev_set, epoch )
 
-			if self.scheduler1 != None:
-				print( "Current Learning rate = ", self.scheduler1.get_last_lr() )
-
 			toc = time.time()
 			time_ = toc - tic
 						
 			# Stored values - Loss, Recall, Precision, F1score, AvgPrecision, MatthewsCorrCoef, AUROC, Accuracy, Epoch, Time.
 			epoch_met = np.round( np.mean( train_batch_dict, axis = 0 ), self.prec )
+			# print( epoch_met )
+			# exit()
 			train_mat = np.append( train_mat, epoch_met )
 			train_mat = np.append( train_mat, [epoch, ( time_ )] )
 

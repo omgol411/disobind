@@ -2,19 +2,11 @@
 ############Attention coupled with Convolutions############
 ###########################################################
 import numpy as np
-import random
-from collections import OrderedDict
-
-from sklearn.linear_model import LogisticRegression
-from sklearn.calibration import CalibratedClassifierCV
 
 import torch
 from torch import nn
-import torch.utils.data as Data
-import torch.nn.functional as F
-from torch.autograd import Variable
 
-from src.models.get_activation import *
+from src.models.get_activation import get_activation
 from src.models.get_layers import ( create_projection_layers, 
                                     create_upsampling_layers, 
                                     create_downsampling_layers )
@@ -148,7 +140,6 @@ class Epsilon_3( nn.Module ):
             n, l1, l2, c = interaction_tensor.shape
             o = interaction_tensor.view( n, -1, c )
 
-        # This is referred to as MLP in the paper.
         if self.hidden_block[0] == "vanilla":
             o = self.vanilla_block( o )
         elif self.hidden_block[0] == "residual":

@@ -18,11 +18,14 @@ Use the following script to define the model configurations for model training.
 dataset_version = 19
 # Select from models in src/models/
 model = "Epsilon_3" 
-emb = "T5"             # ["T5", "ProstT5", "ProSE", "BERT", "ESM2-650M"]
+emb = "T5"             # ["T5", "ProstT5", "ProSE"]
 emb_type = "global"    # ["global", "local"]
+# model_type = "vanilla" # ["vanilla", "correction, "inverse", "meta"]
+# ["obj", "bin_size", "pool type", "bin_post_proj", "bin_input", "single_output"]
+#       obj --> ["interaction", "interface", "interaction_bin", "interface_bin"]
 objective = ["interface_bin", 10, "avg", False, True, False]
 # Specify location for storing ablation results. For no ablations set it to "".
-ablations_dir = "" # "Ablations/"  # Uncomment while running ablations.
+ablations_dir = "" # "Ablations/"
 """
 Note:
 interaction/interaction_bin refers to the contact map prediction task.
@@ -37,12 +40,11 @@ objective is list of 4 elements:
     single_output --> deprecated. Leave it to False.
 """
 
-########################
-
+# While using Optuna, provide categorical inputs as a list and continous inputs as a list containing start and end param values.
 data = {
     "Version": "5",
     "Embedding": f"{emb}",
-    "Emb_type": emb_type,
+    "Emb_type": f"{emb_type}",
     "Model": model,
     "System": str( system.strip() ),
     "Global_seed": 1,
@@ -57,19 +59,20 @@ data = {
             #  "separate_proj_layer" --> use separate or common projection layer ["separate" or ""]]
             "projection_layer": [[128, "ln2", True, 1, ""]],
             "output_dim": 1,
-            # ["aggregate", "conactenate", "interface"]
+            # ["aggregate", "conactenate", "interface", "placement"]
             #       aggregate --> ["add", "substract", "multiply", "op-od", "dot", "cosine"]
             #       concatenate --> ["vanilla", "conact"]
-            #       interface --> ["avg1d", "avg2d", "lin", ""] - required for interface not for interaction task.
+            #       interface --> ["avg1d", "avg2d", "lin"]
+            #       placement --> ["pre_proj", "post_concat", "post_hid", "post_out"]
             "input_layer": ["op-od", "vanilla", "lin"],
-            # For Monte carlo dropout. #samples to be taken. -- deprecated
+            # For Monte carlo dropout. #samples to be taken.
             "num_samples": 0,
             # ["#US_layers", "#DS_layers", "num_blocks", "scale_factor"", 
             #               "hidden_block_type - vanilla/residual", 
             #               "residual_connection -- vanilla/addnorm/addactivnorm"]
             "num_hid_layers": [[0, 0, 0, 0, "vanilla", ""]],
             "bias": True,
-            # [dropout1, dropout2, us_dropout, ds_dropout, mc_dropout (deprecated)]
+            # [dropout1, dropout2, us_dropout, ds_dropout, mc_dropout]
             "dropouts": [[0.2, 0, 0, 0, 0]],
             # Supported - BNorm (BN), INorm (IN), LNorm (LN)
             "norm": [True, "LN"],
@@ -77,11 +80,9 @@ data = {
             "temperature": None, 
             # ["vanilla", "conf", "mc", "count_reg"]
             "output_layer": "vanilla",
-            # [activation name, activation param]
             "activation1": [["elu", None]],
-            # [activation name, apply activation or not]
             "activation2": ["sigmoid", True],
-            "device": "cpu",
+            "device": "cuda",
             "objective": objective
             },
         "dataset": {
@@ -103,7 +104,7 @@ data = {
             "mask": [False, True],
             "num_metrics": [7, "global"],
             "Nruns": 1,
-            # Look src/loss.py
+            # ["bce", "bce_with_logits", "representation_loss", "count_reg_loss"] -- src/loss.py
             "loss": "se_loss",
             # Set weights to be used for loss calculation.
             "log_weight": [[0.9, 3]],
@@ -145,4 +146,7 @@ data = {
     }
 
 OmegaConf.save( config = data, f = "version_{}.yml".format( data["Version"] ) )
+
+
+
 
