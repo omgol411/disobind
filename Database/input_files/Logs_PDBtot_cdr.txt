@@ -1,0 +1,4 @@
+Total (unsplit) entries in PDB TOT = 513
+Total entries in PDB TOT = 1373
+Total (unsplit) entries in PDB CDR: DOR --> = 160 	 DDR --> = 164
+Total entries in PDB TOT and CDR = 2858

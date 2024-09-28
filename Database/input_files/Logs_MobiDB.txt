@@ -1,0 +1,22 @@
+<--------------------- Logs: MobiDB --------------------->
+Category: curated-disorder-merge
+Total entries on MobiDB = 2816
+Total entries obtained so far = 2816
+Time taken = 7.8226690769195555 minutes
+-------------------------------------
+Category: curated-lip-merge
+Total entries on MobiDB = 1408
+Total entries obtained so far = 4224
+Time taken = 2.1439912716547647 minutes
+-------------------------------------
+Category: homology-disorder-merge
+Total entries on MobiDB = 311079
+Total entries obtained so far = 315275
+Time taken = 32.76478677193324 minutes
+-------------------------------------
+Category: homology-lip-merge
+Total entries on MobiDB = 167972
+Total entries obtained so far = 483238
+Time taken = 13.651352854569753 minutes
+-------------------------------------
+Total time taken = 0.9399950549337599 hours...

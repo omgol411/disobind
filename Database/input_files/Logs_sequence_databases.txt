@@ -1,0 +1,5 @@
+Created on: System = b'nty\n' 	 Date = b'Thursday 18 April 2024 08:38:44 AM IST\n'
+Time taken to get all PDB IDs = 1.4381666490766738 hours
+
+No PDBs for Uniprot ID = 353461
+Total Unique Uniprot IDs = 357734
