@@ -81,7 +81,7 @@ data = {
             "activation1": [["elu", None]],
             # [activation name, apply activation or not]
             "activation2": ["sigmoid", True],
-            "device": "cuda",
+            "device": "cpu",
             "objective": objective
             },
         "dataset": {
