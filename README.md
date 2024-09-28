@@ -31,6 +31,8 @@ chmod +x install.sh
 ./install.sh
 ```
 
+For using GPUs, cuda-toolkit (version 11.8) and the drivers are installed on the system.
+
 
 ## Prediction
 In order to use Disobind for making predictions, create a csv file as shown in `example/test.csv`.  
@@ -125,11 +127,10 @@ python analysis.py
 Check all the paths in the constructor before running the script.  
 This script parses Disobind/AF2/AF3 predicted outputs for all tasks and all CG values. Following outputs are generated:
 1. OOD set metrics.
-2. Plots for the contact map (top 10) and interfaces (all).
-3. OOD set calibration plots and raw data for each task.
-4. AF2 vs AF3 confidence plot and raw data.
-5. Sparsity vs F1 score plot and raw data.
-6. Contact density vs Metric (Recall/ Precision/ F1 score) and raw data.
+2. OOD set calibration plots and raw data for each task.
+3. AF2 vs AF3 confidence plot and raw data.
+4. Sparsity vs F1 score plot and raw data.
+5. Contact density vs Metric (Recall/ Precision/ F1 score) and raw data.
 
 
 
