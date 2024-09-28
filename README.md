@@ -103,10 +103,6 @@ This script creates a dict containing the following outputs for all tasks (conta
 3. Binary target masks
 4. Binary mask fo IDR-IDR interactions (disorder_mat1)
 5. Binary mask fo IDR-any interactions (disorder_mat2)
-6. Binary mask for disorder promoting residues in prot1.
-7. Binary mask for disorder promoting residues in prot2.
-8. Binary mask for ALiMs in prot1.
-9. Binary mask for ALiMs in prot2.
 
 
 ### AF2/AF3 predictions
@@ -116,10 +112,7 @@ python get_af_prediction.py
 ```
 Check all the paths in the constructor before running the script.  
 This script creates a dict containing the following outputs for all tasks (contact map/interface) across all CG (1/5/10) from AF2/AF3:
-1. Raw AF2/3 predicted contact map.
-2. pLDDT corrected AF2/3 contact map.
-3. PAE corrected AF2/3 contact map.
-4. pLDDT and PAE corrected AF2/3 contact map.  
+1. pLDDT and PAE corrected AF2/3 contact map.  
 For all OOD set entries, predicted contact maps are zeroed if the ipTM <= 0.75.  
 
 
