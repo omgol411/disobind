@@ -40,6 +40,15 @@ Run the following command to use Disobind for the example case with default sett
 ```
 python run_disobind.py -f ./example/test.csv 
 ```
+This script outputs the following files:  
+* `Predictions.npy`: contains predictions for all input pairs for all specified tasks in as a dictionary.
+* A csv file output for all tasks of all input pair.  
+			1. Contact map predictions:  contains interacting residue pairs for both protein.  
+			2. Interface prediction: contains all interacting residues for both proteins.  
+
+**Note**: A task refers to a combination of an objective ( interaction or interface ) and a coarse-graining resolution (1, 5, 10).  
+	e.g. interaction_5 refers to contact map prediction coarse-graining 5 residues whereas interface_5 refers to interface prediction coarse-graining 5 residues.  
+By default, will only output predictions for interface_10.
 
 
 ## Dataset creation
@@ -47,12 +56,12 @@ Move to the `dataset` directory.
 
 1. Obtain all PDB IDs from databases of disordered proteins including DIBS, MFIB, FuzDB, PBDtot, PDBcdr, DisProt, IDEAL, MobiDB.
 ```
-python 1_disobind_database.py -c 200
+python 1_disobind_database.py -c 250
 ```
 
 2. Download all PDB files, obtain relevant info and create binary complexes with the first protein being disordered.
 ```
-python 2_create_database_dataset_files.py -c 200
+python 2_create_database_dataset_files.py -c 250
 ```
 
 3. Create merged binary complexes.
