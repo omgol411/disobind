@@ -722,10 +722,10 @@ class Disobind():
 					interface1_beads = np.append( interface1_beads, "" )
 
 			df = pd.DataFrame()
-			df["Residue1"] = interface1_beads
-			df["Residue2"] = interface2_beads
+			df["Protein1"] = interface1_beads
+			df["Protein2"] = interface2_beads
 			output = np.concatenate( ( interface1, interface2 ), axis = 0 )
-			df.to_csv( f"{self.abs_path}/{self.output_dir}{entry_id}_{obj}_cg.csv" )
+			df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg.csv" )
 
 		return output, df
 
@@ -773,4 +773,5 @@ if __name__ == "__main__":
 	print( f"Time taken = {toc - tic} seconds" )
 	print( "May the Force be with you..." )
 #################################################################
+
 
