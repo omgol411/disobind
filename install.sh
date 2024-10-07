@@ -11,5 +11,17 @@ else
 fi
 source ~/.bash_profile
 
+# Create conda environment for Disobind.
+conda create --name diso python=3.9
+
+# Activate the conda environment.
+conda activate diso
+
 # Install dependencies.
-pip install ./requirements.txt
+pip install -r ./requirements.txt
+
+# Deactivate conda environment.
+conda deactivate
+
+echo "You are now ready to roll... Don't forget to activate the conda anvironment before using Disobind."
+echo "May the Force serve you well..."
