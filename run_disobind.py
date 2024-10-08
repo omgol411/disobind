@@ -131,6 +131,9 @@ class Disobind():
 		"""
 		tasks = []
 
+		if self.required_cg not in [0, 1, 5, 10]:
+			raise Exception( "Incorrect coarse-grained resolution specified. Choose from [0, 1, 5, 10]..." )
+
 		for obj in ["interaction", "interface"]:
 			if obj == "interaction" and not self.predict_cmap:
 				continue
