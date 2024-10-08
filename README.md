@@ -16,13 +16,17 @@ Disobind is a deep learning method for sequence based, partner-dependent contact
 
 
 ## Installation
-1. Clone the repository
+1. Install conda  
+If not already installed, installed Conda as specified here: https://docs.conda.io/projects/conda/en/latest/index.html.
+
+
+2. Clone the repository
 ```
 git clone https://github.com/isblab/disobind.git
 ```
 
 
-2. Set up the repository  
+3. Set up the repository  
 
 Run the following commands in order:
 ```
@@ -31,15 +35,30 @@ chmod +x install.sh
 ./install.sh
 ```
 
-For using GPUs, cuda-toolkit (version 11.8) and the drivers are installed on the system.
+For using GPUs, ensure cuda-toolkit (version 11.8) and the nvidia drivers are installed on the system.
 
 
 ## Prediction
-In order to use Disobind for making predictions, create a csv file as shown in `example/test.csv`.  
+In order to use Disobind for making predictions, create an input csv file containing UniProt ID, start and end UniProt residue positions for both proteins.  
+`UniProt_ID1,start,end,UniProt_ID2,start,end`  
+As an example see,  shown in `example/test.csv`.  
 Run the following command to use Disobind for the example case with default settings:
 ```
 python run_disobind.py -f ./example/test.csv 
 ```
+By default, Disobind provides interface predictions at a coarse-grained resolution 10.
+
+### Other options
+| Flags  |                                     Description                                    |
+| ------ | ---------------------------------------------------------------------------------- |
+| -f     | path to the input csv file.                                                        |
+| -c     | no. of cores to be used for downloading UniProt sequences (default = 2).           |
+| -o     | output directory name (default: output).                                           |
+| -d     | device to be used - cpu/cuda (default: cpu).                                       |
+| -cm    | boolean flag to predict contact maps (default: False).                             |
+| -cg    | coarse-graining resolution - 0, 1, 5, 10 (default: 10). If 0, predicts for all CG. |
+
+
 This script outputs the following files:  
 * `Predictions.npy`: contains predictions for all input pairs for all specified tasks in as a dictionary.
 * A csv file output for all tasks of all input pair.  
