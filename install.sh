@@ -23,5 +23,5 @@ pip install -r ./requirements.txt
 # Deactivate conda environment.
 conda deactivate
 
-echo "You are now ready to roll... Don't forget to activate the conda anvironment before using Disobind."
+echo "You are now ready to roll... Don't forget to activate the conda anvironment using 'conda activate diso' before using Disobind."
 echo "May the Force serve you well..."
