@@ -728,7 +728,7 @@ class Disobind():
 			df["Protein1"] = interface1_beads
 			df["Protein2"] = interface2_beads
 			output = np.concatenate( ( interface1, interface2 ), axis = 0 )
-			df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg.csv" )
+			df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg{cg}.csv" )
 
 		return output, df
 
