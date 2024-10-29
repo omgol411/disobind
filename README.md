@@ -4,7 +4,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10360718.svg)]()
 
 # Disobind
-Disobind is a deep learning method for sequence based, partner-dependent contact map and interface prediction.
+Disobind is a deep learning method for predicting partner-dependent contact maps and interface residues for an IDR and its partner from their sequences. 
 
 ## Publication and Data
 * Kartik Majila, Varun Ullanat, Shruthi Viswanath, __Disobind: __, [DOI]().
