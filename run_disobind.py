@@ -16,12 +16,15 @@ import time
 import joblib
 import tqdm
 from multiprocessing import Pool
+import pickle as pkl
+from Bio.PDB import PDBParser, MMCIFParser
 
 import torch
 from torch import nn
 
 import dataset
 from dataset.from_APIs_with_love import get_uniprot_seq
+from dataset.utility import get_contact_map
 from dataset.create_input_embeddings import Embeddings
 from src.models.get_model import get_model
 from src.utils import prepare_input
@@ -64,6 +67,12 @@ class Disobind():
 		self.max_len = 100
 		# Contact probability threshold.
 		self.threshold = 0.5
+		# Distance cutoff for defining a contact.
+		self.dist_threshold = 8
+		# pLDDT cutoff.
+		self.plddt_threshold = 70
+		# PAE cutoff.
+		self.pae_threshold = 5
 		# Batch size for obtaining embeddings.
 		self.batch_size = 200
 		# Objective settings to be used for prediction.
@@ -107,11 +116,11 @@ class Disobind():
 				Download the sequences.
 		"""
 		# base_path = f"/data2/kartik/Disorder_Proteins/Archive/Database_17Apr24/v_{self.version}/"
-		headers = self.read_csv_input()
+		headers, af_paths = self.read_csv_input()
 
 		prot_pairs = self.process_input_pairs( headers )
 
-		self.get_predictions( prot_pairs )
+		self.get_predictions( prot_pairs, af_paths )
 
 		np.save( f"./{self.output_dir}/{self.output_filename}.npy", self.predictions )
 
@@ -149,7 +158,7 @@ class Disobind():
 		return tasks
 
 
-	def get_predictions( self, prot_pairs ):
+	def get_predictions( self, prot_pairs, af_paths ):
 		"""
 
 		Input:
@@ -181,7 +190,7 @@ class Disobind():
 			os.chdir( self.abs_path )
 
 			print( "Running predictions..." )
-			batch_preds = self.predict( required_tasks )
+			batch_preds = self.predict( required_tasks, af_paths )
 			self.predictions.update( batch_preds )
 
 			t_end = time.time()
@@ -197,6 +206,8 @@ class Disobind():
 		"""
 		Read from a csv file containing prot1 and prot2 info as:
 			Uni_ID1,start1,end1,Uni_ID2,start2,end2
+		To combine AF2 and Disobind predictions, provide the path to the AF2 model and .pkl file as:
+			Uni_ID1,start1,end1,Uni_ID2,start2,end2,model_file_path,pkl_file_path
 
 		Input:
 		----------
@@ -207,6 +218,7 @@ class Disobind():
 		headers --> list of entry_ids for al binary complexes.
 		"""
 		headers = []
+		af_paths = {}
 		with open( self.input_file, "r" ) as f:
 			input_pairs = f.readlines()
 
@@ -214,22 +226,130 @@ class Disobind():
 		for pair in input_pairs:
 			pair = pair.strip()
 			# Ignore empty string if present in the input.
-			if len( pair.split( "," ) ) != 6:
-				raise Exception( f"Incorrect input format... Supported format: UniID1,start1,end1,UniID2,start2,end2" )
-			
-			else:
+			if len( pair.split( "," ) ) == 6:
 				uni_id1, start1, end1, uni_id2, start2, end2 = pair.split( "," )
-				if int( int( end1 ) - int( start1 ) + 1 > self.max_len ):
-					print( f"Ignoring entry {pair}: Prot1 length exceeds max bound..." )
-				elif int( int( end2 ) - int( start2 ) + 1 > self.max_len ):
-					print( f"Ignoring entry {pair}: Prot2 length exceeds max bound..." )
-				else:
-					entry_id = f"{uni_id1}:{start1}:{end1}--{uni_id2}:{start2}:{end2}_0"
+				af_model_file, af_pae_file = None, None
 
-					headers.append( entry_id )
+			elif len( pair.split( "," ) ) == 8:
+				uni_id1, start1, end1, uni_id2, start2, end2, af_model_file, af_pae_file = pair.split( "," )
 
-		return headers
+			else:
+				raise Exception( f"Incorrect input format..." )
 
+			entry_id = f"{uni_id1}:{start1}:{end1}--{uni_id2}:{start2}:{end2}_0"
+			headers.append( entry_id )
+			af_paths[entry_id] = [af_model_file, af_pae_file]
+
+		return headers, af_paths
+
+
+	def get_af_pred( self, model_file, pae_file ):
+		"""
+		Parse the AF2 predicted structure if provided.
+		Obtain contact map, binary pLDDT and PAE matrices.
+		Get contact map with only high confidence contacts:
+			pLDDT >= 70
+			PAE <= 5
+		Pad the contact map up to max_len.
+
+		Input:
+		----------
+		model_file --> PDB file for AF2 predicted structure.
+		pae_file --> pkl file containing the PAE matrix for the AF2 prediction.
+
+		Returns:
+		----------
+		af2_pred --> (np.array) AF2 predicted contact map.
+		"""
+		with open( pae_file, "rb" ) as f:
+			data = pkl.load( f )
+		pae = data["predicted_aligned_error"]
+
+		coords_dict = {}
+		plddt_dict = {}
+		if ".pdb" in model_file:
+			models = PDBParser().get_structure( "pdb", model_file )
+		elif ".cif" in model_file:
+			models = MMCIFParser().get_structure( "cif", model_file )
+		else:
+			raise Exception( "Incorrect file format for the AF2 prediction..." )
+
+		for model in models:
+			for chain in model:
+				coords_dict[chain.id[0]] = []
+				plddt_dict[chain.id[0]] = []
+				for residue in chain:
+					# Take only the ATOM entries and ignore the 
+					# 		HETATM entries (which contain "w" instead of " ").
+					if residue.id[0] == " ":
+						coords_dict[chain.id[0]].append( residue['CA'].coord )
+						plddt_dict[chain.id[0]].append( residue["CA"].get_bfactor() )
+				coords_dict[chain.id[0]] = np.array( coords_dict[chain.id[0]] )
+
+		plddt_mat, pae_mat = self.get_plddt_pae_mat( plddt_dict, pae )
+		pae_mat = np.where( pae_mat <= self.pae_threshold, 1, 0 )
+
+		chainA, chainB = coords_dict.keys()
+		contact_map = get_contact_map( coords_dict[chainA], coords_dict[chainB], self.dist_threshold )
+
+		m, n = contact_map.shape
+		pad = np.zeros( ( self.max_len, self.max_len ) )
+		pad[:m, :n] = contact_map
+		contact_map = pad
+
+		af2_pred = contact_map*plddt_mat*pae_mat
+
+		return af2_pred
+
+
+
+	def get_plddt_pae_mat( self, plddt_dict, pae ):
+		"""
+		Create a binary matrix based on:
+			plDDT values of prot1/2 for AF2 structures.
+				plDDT >= 70 --> 1 else 0
+			PAE matrix
+				plDDT <= 5 --> 1 else 0
+
+		Input:
+		----------
+		plddt_dict --> dict containing Ca-plddt for all residues in all chains.
+		pae --> AF2/3 predicted PAE matrix.
+
+		Returns:
+		----------
+		plddt_mat --> binary mask indicating residues with high pLDDT.
+		pae_mat --> binary mask indicating residues with high PAE.
+		"""
+		chain1, chain2 = list( plddt_dict.keys() )
+		plddt1 = np.array( plddt_dict[chain1] ).reshape( -1, 1 )
+		plddt2 = np.array( plddt_dict[chain2] ).reshape( 1, -1 )
+		plddt1 = np.where( plddt1 >= self.plddt_threshold, 1, 0 )
+		plddt2 = np.where( plddt2 >= self.plddt_threshold, 1, 0 )
+		plddt_mat = plddt1*plddt2
+
+		m, n = plddt_mat.shape
+		padded_mat = np.zeros( ( self.max_len, self.max_len ) )
+
+		padded_mat[:m, :n] = plddt_mat
+		plddt_mat = padded_mat
+
+		# Taking the upper-right and lower-left quadrants.
+		pae_ur = pae[:m, m:]
+		pae_ll = pae[m:, :m]
+		pae = ( pae_ur + pae_ll.T )/2
+
+		if m != pae.shape[0] or n != pae.shape[1]:
+			raise Exception( "Incorrect PAE matrix dimensions..." )
+
+		m, n = pae.shape
+		pae_mat = np.zeros( ( self.max_len, self.max_len ) )
+		pae_mat[:m, :n] = pae
+
+		# Create a binary PAE matrix to highlight confident predictions.
+		pae_mat = np.where( pae_mat <= self.pae_threshold, 1, 0 )
+
+		return plddt_mat, pae_mat
 
 
 ###################################################################################
@@ -517,7 +637,7 @@ class Disobind():
 
 
 
-	def predict( self, required_tasks ):
+	def predict( self, required_tasks, af_paths ):
 		"""
 		Predict cmap for the input protein pair from all models.
 		Store all predictions in a nested  dict:
@@ -601,7 +721,21 @@ class Disobind():
 					target_mask = target_mask.reshape( n, h )
 					cal_output = cal_output*target_mask
 
-					cal_output, df = self.extract_model_output( entry_id, cal_output, eff_len )
+					# Get AF2 pred for the entry.
+					model_file, pae_file = af_paths[entry_id]
+					# If AF2 input is not provided.
+					if model_file != None:
+						af2_pred = self.get_af_pred( model_file = model_file, pae_file = pae_file )
+						af2_pred = self.process_af2_pred( af2_pred )
+
+						# Get Disobind+AF2 output.
+						m, n = cal_output.shape
+						af2_diso = np.stack( [cal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
+						output = np.max( af2_diso, axis = 1 ).reshape( m, n )
+					else:
+						output = cal_output
+
+					output, df = self.extract_model_output( entry_id, output, eff_len )
 					
 					predictions[pair_id][entry_id][f"{obj}_{cg}"] = {
 																	"Disobind_cal": np.float32( cal_output ),
@@ -610,6 +744,34 @@ class Disobind():
 					print( f"{idx} ------------------------------------------------------------\n" )
 		return predictions
 
+
+	def process_af2_pred( self, af2_pred ):
+		"""
+		Get contact map or interface residues from AF2 
+			predicted contact map for the required CG.
+
+		Input:
+		----------
+		af2_pred --> (np.array) AF2 predicted contact map.
+
+		Returns:
+		----------
+		"""
+		if self.objective[1] > 1:
+			m = nn.MaxPool2d( kernel_size = self.objective[1], stride = self.objective[1] )
+			af2_pred = m( torch.from_numpy( af2_pred ).unsqueeze( 0 ).unsqueeze( 0 ) )
+			af2_pred = af2_pred.squeeze( [0, 1] ).numpy()
+
+		if "interface" in self.objective[0]:
+			p1 = np.zeros( ( af2_pred.shape[0], 1 ) )
+			p2 = np.zeros( ( af2_pred.shape[0], 1 ) )
+
+			idx = np.where( af2_pred )
+			p1[idx[0]] = 1
+			p2[idx[1]] = 1
+			af2_pred = np.concatenate( [p1, p2], axis = 1 )
+
+		return af2_pred
 
 
 	def get_beads( self, cg, prot1, prot2 ):
@@ -728,7 +890,7 @@ class Disobind():
 			df["Protein1"] = interface1_beads
 			df["Protein2"] = interface2_beads
 			output = np.concatenate( ( interface1, interface2 ), axis = 0 )
-			df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg{cg}.csv" )
+		df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg{cg}.csv" )
 
 		return output, df
 
