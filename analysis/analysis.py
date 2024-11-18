@@ -562,6 +562,7 @@ class JudgementDay():
 
 
 
+
 	def case_specific_analysis( self ):
 		"""
 		Analysis of the top performing OOD pairs.
@@ -574,53 +575,70 @@ class JudgementDay():
 		----------
 		None
 		"""
-		top_pairs = ["P04273:95:193--P04273:95:193_0", "P07101:109:160--P07101:109:160_1",
-					"P58771:132:192--P58771:132:192_11", "P12883:1785:1850--P12883:1785:1850_206",
-					"P58771:181:270--P58771:181:270_17", "P58771:71:131--P58771:71:131_2",
-					"Q91Z83:1875:1935--Q91Z83:1875:1935_146", "Q16236:506:559--O15525:23:122_0"]
+		top_pairs = ["P25024:1:29--P10145:28:93_0", "P04273:95:193--P04273:95:193_0"]
+		fig, ax = plt.subplots( 8, 1, figsize = ( 15, 15 ) )
 
-		fig, ax = plt.subplots( 8, 1, figsize = ( 15, 15 ) ) # , constrained_layout = True
-		# fig.tight_layout()
-
+		w = open( f"{self.case_specific_analysis_file}.txt", "w" )
 		i = 0
 		for entry_id in top_pairs:
 			uni_id1, uni_id2 = entry_id.split( "--" )
 			uni_id2, cp = uni_id2.split( "_" )
-			uni_id1, _, _ = uni_id1.split( ":" )
-			uni_id2, _, _ = uni_id2.split( ":" )
+			uni_id1, s1, e1 = uni_id1.split( ":" )
+			uni_id2, s2, e2 = uni_id2.split( ":" )
 
 			id_ = f"{uni_id1}--{uni_id2}_{cp}"
 
 			diso_pred = self.disobind_preds[entry_id]["interface_1"]["Disobind_cal"]
 			diso_pred = np.where( diso_pred >= self.contact_threshold, 1, 0 )
 
+			af2_pred = self.af2m_preds[entry_id]["interface_1"]["AF2_pLDDT_PAE"]
+			print( af2_pred.shape )
+
+			af2_diso = np.stack( [diso_pred, af2_pred], axis = 1 )
+			print( af2_diso.shape )
+			af2_diso = np.max( af2_diso, axis = 1 )
+			print( af2_diso.shape )
+
+			target = np.array( self.target_cmap[entry_id] )
+			target = self.prepare_target( target, "interface_1" )
+			print( target.shape )
+
+			# Write predicted interface residues.
+			uni_pos1 = np.arange( int( s1 ), int( e1 ) + 1, 1 )
+			uni_pos2 = np.arange( int( s2 ), int( e2 ) + 1, 1 )
+
+			idx1 = np.where( af2_diso[:100] == 1 )[0]
+			idx2 = np.where( af2_diso[100:] == 1 )[0]
+
+			uni_pos1 = ranges( uni_pos1[idx1] )
+			uni_pos1 = [f"{e[0]}-{e[1]}" for e in uni_pos1]
+			uni_pos2 = ranges( uni_pos2[idx2] )
+			uni_pos2 = [f"{e[0]}-{e[1]}" for e in uni_pos2]
+			
+			w.writelines( f"{entry_id}\n" )
+			w.writelines( f"Predicted prot1 interface: {','.join( uni_pos1 )}\n" )
+			w.writelines( f"Predicted prot2 interface: {','.join( uni_pos2 )}\n" )
+
+			# Write target interface residues.
+			uni_pos1 = np.arange( int( s1 ), int( e1 ) + 1, 1 )
+			uni_pos2 = np.arange( int( s2 ), int( e2 ) + 1, 1 )
+
+			idx1 = np.where( target[:100] == 1 )[0]
+			idx2 = np.where( target[100:] == 1 )[0]
+
+			uni_pos1 = ranges( uni_pos1[idx1] )
+			uni_pos1 = [f"{e[0]}-{e[1]}" for e in uni_pos1]
+			uni_pos2 = ranges( uni_pos2[idx2] )
+			uni_pos2 = [f"{e[0]}-{e[1]}" for e in uni_pos2]
+
+			w.writelines( f"Target prot1 interface: {','.join( uni_pos1 )}\n" )
+			w.writelines( f"Target prot2 interface: {','.join( uni_pos2 )}\n" )
+
 			hf = h5py.File( f"{self.merged_binary_complexes_dir}{id_}.h5" )
-			print( id_ )
-			print( np.array( hf["merged_entries"] ) )
-			total = np.array( hf["conformers"] )
-			summed_cmap = np.array( hf["summed_cmap"] )/total
-			
-			pad = np.zeros( ( self.max_len, self.max_len ) )
-			m, n = summed_cmap.shape
-			pad[:m, :n] = summed_cmap
-			summed_cmap = pad
-			# m = nn.MaxPool2d(  )
-
-			merged_interface = np.concatenate( 
-											( np.max( summed_cmap, axis = 1 ),
-											np.max( summed_cmap, axis = 0 ) ),
-											axis = 0
-											 ).reshape( 200, 1 )
-			empty = np.zeros( ( 200, 1 ) )
-			
-			plot = np.stack( [diso_pred, empty, merged_interface ] )
-			ax[i].imshow( plot, cmap = plt.cm.Greens.reversed() )
-			ax[i].set_aspect( 8 )
-			plt.subplots_adjust( hspace = 0 )
-			i += 1
-
-		plt.savefig( f"{self.top_preds_file}.png", dpi = 300 )
-		plt.close()
+			pdbs = np.array( hf["merged_entries"] )
+			print( pdbs )
+			w.writelines( "\n-----------------------------------------------\n" )
+		w.close()
 
 
 
