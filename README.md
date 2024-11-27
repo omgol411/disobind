@@ -16,7 +16,7 @@ Disobind is a deep learning method for predicting interprotein contact maps and 
 
 
 ## Installation
-1. Install conda  
+1. Install Conda  
 If not already installed, installed Conda as specified here: https://docs.conda.io/projects/conda/en/latest/index.html.
 
 
