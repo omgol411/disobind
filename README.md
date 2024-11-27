@@ -82,6 +82,10 @@ This script outputs the following files:
 
 * `Predictions.npy`: contains predictions for all input sequence fragment pairs in a nested dictionary.
 
+
+**Note** For dataset creation, model training, and analysis look the README in the `dataset/`, `src/`, and `analysis` directories respectively.
+
+
 ## Dataset creation
 Move to the `dataset` directory.  
 
