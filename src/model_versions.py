@@ -90,7 +90,7 @@ data = {
             "train_set_size": 0.9,
             "dev_set_size": 0.05,
             "test_set_size": 0.05,
-            "input_files": f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/v_{dataset_version}/{emb}/{emb_type}-None/", 
+            "input_files": f"../database/v_{dataset_version}/{emb}/{emb_type}-None/",
             "train_file": f"Train_set_{emb_type}_v_{dataset_version}.npy",
             "dev_file": f"Dev_set_{emb_type}_v_{dataset_version}.npy",
             "test_file": f"Test_set_{emb_type}_v_{dataset_version}.npy",
