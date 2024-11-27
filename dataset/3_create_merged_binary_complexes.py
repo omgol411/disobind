@@ -43,7 +43,7 @@ class Dataset ():
 		"""
 		self.tim = time.time()   # Just for calculating total time.
 		self.version = version
-		self.base_path = f"../Database/v_{self.version}"
+		self.base_path = f"../database/v_{self.version}"
 		self.dataset_version = "100_20_0.2"
 		# Dir containing PDB/CIF files.
 		self.pdb_path = "../Combined_PDBs/"

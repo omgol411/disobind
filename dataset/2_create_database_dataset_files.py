@@ -55,8 +55,8 @@ class parse_pdbs_for_idrs():
 		self.batch_size = 25000
 		self.create_dataset = create_dataset
 
-		self.base_path = "/data2/kartik/Disorder_Proteins/disobind/Database/"
-		# self.base_path = "../Database/"
+		self.base_path = "/data2/kartik/Disorder_Proteins/disobind/database/"
+		# self.base_path = "../database/"
 		self.merged_PDBs = f"../input_files/Merged_PDB_IDs.txt"
 		# Dir for PDB/CIF files.
 		self.PDB_path = f"../Combined_PDBs/"

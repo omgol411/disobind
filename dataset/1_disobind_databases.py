@@ -376,19 +376,19 @@ class TheIlluminati():
 		""" 
 	 
 		if not os.path.exists( self.dibs ):
-			raise Exception( "DIBS database file not found in Database/raw/..." )
+			raise Exception( "DIBS database file not found in database/raw/..." )
 		
 		if not os.path.exists( self.mfib ):
-			raise Exception( "MFIB database file not found in Database/raw/..." )
+			raise Exception( "MFIB database file not found in database/raw/..." )
 		
 		if not os.path.exists( self.fuzzdb ):
-			raise Exception( "FuzzDB database file not found in Database/raw/..." )
+			raise Exception( "FuzzDB database file not found in database/raw/..." )
 		
 		if not os.path.exists( self.pdb_tot ):
-			raise Exception( "PDBtot dataset file not found in Database/raw/..." )
+			raise Exception( "PDBtot dataset file not found in database/raw/..." )
 		
 		if not os.path.exists( self.pdb_cdr ):
-			raise Exception( "PDBcdr dataset file not found in Database/raw/..." )
+			raise Exception( "PDBcdr dataset file not found in database/raw/..." )
 
 		if os.path.exists( f"{self.base_path}{self.output_file}" ):
 			print( f"{self.output_file} already exists..." )
@@ -460,10 +460,10 @@ class The3Muskteers():
 		""" 
 
 		if not os.path.exists( self.disprot_path ):
-			raise Exception( "DisProt database file not found in Database/raw/..." )
+			raise Exception( "DisProt database file not found in database/raw/..." )
 		
 		if not os.path.exists( self.ideal_path ):
-			raise Exception( "IDEAL database file not found in Database/raw/..." )
+			raise Exception( "IDEAL database file not found in database/raw/..." )
 		
 		print("\n<================================>\n")
 		if not os.path.exists( self.disprot_csv ):
@@ -1051,7 +1051,7 @@ if __name__ == "__main__":
 	parser.add_argument( '--max_cores', '-c', dest="c", help = "No. of cores to be used.", type = int, required=False, default=10 )
 	
 	t0 = time.time()
-	database_path = f"../Database/"
+	database_path = f"../database/"
 	dir_name = "input_files/"
 
 	if not os.path.exists( f"{database_path}{dir_name}" ):

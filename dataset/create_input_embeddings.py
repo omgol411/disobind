@@ -60,7 +60,7 @@ class Embeddings():
 
 		if base_path == None:
 			# Absolute path for the Database directory.
-			self.base_path = os.path.abspath( "../Database/" )
+			self.base_path = os.path.abspath( "../database/" )
 			self.dataset_path = f"{self.base_path}{self.embedding_type}/{self.scope}/"
 
 		else:

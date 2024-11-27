@@ -35,7 +35,7 @@ class NonRedundantDataset():
 		"""
 		self.tim = time.time()   # Just for calculating total time.
 		self.version = version
-		self.base_path = f"../Database/{self.version}"
+		self.base_path = f"../database/{self.version}"
 		self.dataset_version = "100_20_0.2"
 		# Dir containing PDB/CIF files.
 		self.pdb_path = "../Combined_PDBs/"
