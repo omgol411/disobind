@@ -174,7 +174,7 @@ This script parses Disobind/AF2/AF3 predicted outputs for all tasks and all CG v
 2. OOD set calibration plots and raw data for the plots. 
 3. AF2 vs AF3 confidence plot and raw data for the plots. 
 4. Sparsity vs F1 score plot and raw data for the plots. 
-5. Contact density vs Metric (Recall/ Precision/ F1 score) and raw data for the plots.
+5. Predicted interfaces at CG 1 for case specific analysis in a .txt file.
    
 
 ## Information
