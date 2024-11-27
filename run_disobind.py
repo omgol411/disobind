@@ -86,7 +86,7 @@ class Disobind():
 		self.uniprot_seq = {}
 
 		# Dir containing the Disobind models.
-		self.model_dir = "./Models/"
+		self.model_dir = "./models/"
 		# Filename to store predictions.
 		self.output_filename = "Predictions"
 
