@@ -70,14 +70,14 @@ class Prediction():
 		self.disorder_dict = {}
 
 		# Csv file path for DisProt/IDEAL?mobiDB.
-		self.disprot_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/input_files/DisProt.csv"
-		self.ideal_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/input_files/IDEAL.csv"
-		self.mobidb_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/input_files/MobiDB.csv"
+		self.disprot_path = f"../database/input_files/DisProt.csv"
+		self.ideal_path = f"../database/input_files/IDEAL.csv"
+		self.mobidb_path = f"../database/input_files/MobiDB.csv"
 
 		# Test contact maps file name.
-		self.cmaps_file =  f"/data2/kartik/Disorder_Proteins/disobind_archive/database/v_{self.version}/Output_bcmap_test_v_{self.version}.h5"
+		self.cmaps_file =  f"../database/v_{self.version}/Output_bcmap_test_v_{self.version}.h5"
 		# Uniprot file name.
-		self.Uniprot_seq_file =  f"/data2/kartik/Disorder_Proteins/disobind_archive/database/v_{self.version}/Uniprot_seq.json"
+		self.Uniprot_seq_file =  f"../disobind_archive/database/v_{self.version}/Uniprot_seq.json"
 		# self.output_dir = f"Predictions_{self.mod}_{self.mod_ver}"
 		# Name for output directory.
 		if self.mode == "ood":
@@ -100,16 +100,16 @@ class Prediction():
 			os.makedirs( self.output_dir, exist_ok = True )
 		
 		# Absolute path to the analysis dir.
-		self.abs_path = "/home/kartik/Documents/Disorder_Proteins/disobind_archive/analysis/"
+		self.abs_path = os.path.abspath( "disobind/analysis/" )
 		# Path fo the FASTA file for prot1/2 sequences.
-		self.fasta_file = f"{self.abs_path}{self.output_dir}/p1_p2_test.fasta"
+		self.fasta_file = f"{self.abs_path}/{self.output_dir}/p1_p2_test.fasta"
 		# Path fo the h5 file for prot1/2 embeddings.
-		self.emb_file = f"{self.abs_path}{self.output_dir}/p1_p2_test.h5"
+		self.emb_file = f"{self.abs_path}/{self.output_dir}/p1_p2_test.h5"
 
 		# Disordered residues dict file path.
-		self.disorder_file_path = f"{self.abs_path}{self.output_dir}/disorder_dict.json"
+		self.disorder_file_path = f"{self.abs_path}/{self.output_dir}/disorder_dict.json"
 		# Logs file path.
-		self.logs_file = f"{self.abs_path}{self.output_dir}/Logs.json"
+		self.logs_file = f"{self.abs_path}/{self.output_dir}/Logs.json"
 
 		self.logs = {"counts": {}}
 
