@@ -94,7 +94,7 @@ data = {
             "train_file": f"Train_set_{emb_type}_v_{dataset_version}.npy",
             "dev_file": f"Dev_set_{emb_type}_v_{dataset_version}.npy",
             "test_file": f"Test_set_{emb_type}_v_{dataset_version}.npy",
-            "output_path": f"../Models/{model}_Train/{ablations_dir}",
+            "output_path": f"../models/{model}_Train/{ablations_dir}",
             "batch_size": 64,
             "batch_shuffle": [True, False, False]
             },
