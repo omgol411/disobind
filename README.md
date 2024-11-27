@@ -1,4 +1,4 @@
-#TODO folder names: caps and small  
+~~#TODO folder names: caps and small~~  
 #TODO  : separate the predictions from disobind training and dataset creatation  
 ~~#TODO add how to run with AF2 . Mention that default is without.~~  
 ~~#TODO interface 1 is the default~~  
