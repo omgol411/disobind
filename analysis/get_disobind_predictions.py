@@ -45,7 +45,7 @@ class Prediction():
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
 		# Input file containing the prot1/2 headers.
-		self.input_file = "/data2/kartik/Disorder_Proteins/disobind_archive/database/v_19/prot_1-2_test_v_19.csv"
+		self.input_file = "../database/v_19/prot_1-2_test_v_19.csv"
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.

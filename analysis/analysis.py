@@ -18,7 +18,7 @@ class JudgementDay():
 		# Dataset version.
 		self.version = 19
 		# path for the dataset dir.
-		self.base_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/"
+		self.base_path = f"../database/"
 		# Seed for the PRNGs.
 		self.global_seed = 11
 		# Cutoff to dfine contact for disobind predictions.
