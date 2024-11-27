@@ -49,10 +49,10 @@ Each row corresponds to one sequence fragment pair for which the Disobind predic
 
 Each row contains the UniProt ID, start, and end UniProt residue positions for each of the two protein sequence fragments.  
 
-To run a Disobind prediction only, provide the input as:
+To run a Disobind prediction only, provide the input as:  
 `UniProt_ID1,start1,end1,UniProt_ID2,start2,end2`.
 
-To run a Disobind+AF2 prediction, provide the input as:
+To run a Disobind+AF2 prediction, provide the input as:  
 `UniProt_ID1,start1,end1,UniProt_ID2,start2,end2,AF2_struct_file_path,AF2_pkl_file_path`.
 
 As an example see `example/test.csv`.  
