@@ -45,7 +45,7 @@ class Prediction():
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
 		# Input file containing the prot1/2 headers.
-		self.input_file = "/data2/kartik/Disorder_Proteins/disobind_archive/Database/v_19/prot_1-2_test_v_19.csv"
+		self.input_file = "/data2/kartik/Disorder_Proteins/disobind_archive/database/v_19/prot_1-2_test_v_19.csv"
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
@@ -70,14 +70,14 @@ class Prediction():
 		self.disorder_dict = {}
 
 		# Csv file path for DisProt/IDEAL?mobiDB.
-		self.disprot_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/input_files/DisProt.csv"
-		self.ideal_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/input_files/IDEAL.csv"
-		self.mobidb_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/input_files/MobiDB.csv"
+		self.disprot_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/input_files/DisProt.csv"
+		self.ideal_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/input_files/IDEAL.csv"
+		self.mobidb_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/input_files/MobiDB.csv"
 
 		# Test contact maps file name.
-		self.cmaps_file =  f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/v_{self.version}/Output_bcmap_test_v_{self.version}.h5"
+		self.cmaps_file =  f"/data2/kartik/Disorder_Proteins/disobind_archive/database/v_{self.version}/Output_bcmap_test_v_{self.version}.h5"
 		# Uniprot file name.
-		self.Uniprot_seq_file =  f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/v_{self.version}/Uniprot_seq.json"
+		self.Uniprot_seq_file =  f"/data2/kartik/Disorder_Proteins/disobind_archive/database/v_{self.version}/Uniprot_seq.json"
 		# self.output_dir = f"Predictions_{self.mod}_{self.mod_ver}"
 		# Name for output directory.
 		if self.mode == "ood":

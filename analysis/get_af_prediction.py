@@ -27,7 +27,7 @@ class AF2MPredictions():
 		# Dataset version.
 		self.version = 19
 		# path for the dataset dir.
-		self.base_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/Database/v_{self.version}/"
+		self.base_path = f"/data2/kartik/Disorder_Proteins/disobind_archive/database/v_{self.version}/"
 
 		# Distance threshold for creating the binary contact map.
 		self.dist_threshold = 8
