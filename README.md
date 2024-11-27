@@ -1,10 +1,16 @@
+#TODO folder names: caps and small
+#TODO  : separate the predictions from disobind training and dataset creatation
+#TODO add how to run with AF2 . Mention that default is without.
+#TODO interface 1 is the default
+#TODO example with multiple rows, AF.
+#TODO have outputs of example.
 
 [![PubMed](https://salilab.org/imp-systems/static/images/pubmed.png)]()
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10360718.svg)]()
 
 # Disobind
-Disobind is a deep learning method for predicting interprotein contact maps and interface residues for an IDR and its binding partner from their sequences. 
+Disobind is a deep learning method for predicting inter-protein contact maps and interface residues for an IDR and its binding partner from their sequences. 
 
 ## Publication and Data
 * Kartik Majila, Varun Ullanat, Shruthi Viswanath, __Disobind: __, [DOI]().
@@ -25,7 +31,6 @@ If not already installed, installed Conda as specified here: https://docs.conda.
 git clone https://github.com/isblab/disobind.git
 ```
 
-
 3. Set up the repository  
 
 Run the following commands in order:
@@ -44,7 +49,11 @@ Each row corresponds to one sequence fragment pair for which the Disobind predic
 
 Each row contains the UniProt ID, start, and end UniProt residue positions for each of the two protein sequence fragments.  
 
+To run a Disobind prediction only, provide the input as:
 `UniProt_ID1,start1,end1,UniProt_ID2,start2,end2`.
+
+To run a Disobind+AF2 prediction, provide the input as:
+`UniProt_ID1,start1,end1,UniProt_ID2,start2,end2,AF2_struct_file_path,AF2_pkl_file_path`.
 
 As an example see `example/test.csv`.  
 
@@ -57,13 +66,13 @@ python run_disobind.py -f ./example/test.csv
 By default, Disobind provides interface predictions at a coarse-grained (CG) resolution 10.
 
 ### Other options
-| Flags  |                                     Description                                    |
-| ------ | ---------------------------------------------------------------------------------- |
-| -f     | path to the input csv file.                                                        |
-| -c     | no. of cores to be used for downloading the UniProt sequences (default = 2).           |
-| -o     | output directory name (default: `output`).                                           |
-| -d     | device to be used - cpu/cuda (default: `cpu`).                                       |
-| -cm    | whether to predict inter-protein contact maps (default: `False`). By default, only interface residues are predicted.                            |
+| Flags  |                                     Description                                                                           |
+| ------ | --------------------------------------------------------------------------------------------------------------------------|
+| -f     | path to the input csv file.                                                                                               |
+| -c     | no. of cores to be used for downloading the UniProt sequences (default = 2).                                              |
+| -o     | output directory name (default: `output`).                                                                                |
+| -d     | device to be used - cpu/cuda (default: `cpu`).                                                                            |
+| -cm    | whether to predict inter-protein contact maps (default: `False`). By default, only interface residues are predicted.      |
 | -cg    | coarse-grained resolution - 0, 1, 5, 10 (default: `1`). If `0`, predictions at all resolutions (1,5 and 10) are provided. |
 
 
@@ -116,6 +125,7 @@ Next, start model training using:
 python hparams_search.py -f [CONFIG_FILE] -m manual
 ```
 
+
 ## Analysis
 Move to the `analysis` directory.  
 
@@ -147,7 +157,7 @@ python get_af_prediction.py
 ```
 Check all the paths in the constructor before running the script.  
 
-The contact maps from AF2/AF3 contact maps are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
+The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
 
 ### Perform analysis
@@ -162,7 +172,7 @@ Check all the paths in the constructor before running the script.
 This script parses Disobind/AF2/AF3 predicted outputs for all tasks and all CG values. Following outputs are generated:
 1. OOD set metrics.
 2. OOD set calibration plots and raw data for the plots. 
-3. AF2 vs AF3 confidence plot and raw data for the plots.
+3. AF2 vs AF3 confidence plot and raw data for the plots. 
 4. Sparsity vs F1 score plot and raw data for the plots. 
 5. Contact density vs Metric (Recall/ Precision/ F1 score) and raw data for the plots.
    
