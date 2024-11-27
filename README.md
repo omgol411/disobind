@@ -23,7 +23,7 @@ Disobind is a deep learning method for predicting inter-protein contact maps and
 
 ## Installation
 1. Install Conda  
-If not already installed, installed Conda as specified here: https://docs.conda.io/projects/conda/en/latest/index.html.
+If not already installed, install Conda as specified here: https://docs.conda.io/projects/conda/en/latest/index.html.
 
 
 2. Clone the repository
@@ -83,7 +83,7 @@ This script outputs the following files:
 * `Predictions.npy`: contains predictions for all input sequence fragment pairs in a nested dictionary.
 
 
-**Note** For dataset creation, model training, and analysis look the README in the `dataset/`, `src/`, and `analysis` directories respectively.
+**Note** For dataset creation, model training, and analysis look at the README in the `dataset/`, `src/`, and `analysis` directories respectively.
 
 
 ## Dataset creation
