@@ -928,7 +928,7 @@ if __name__ == "__main__":
 	parser.add_argument( 
 						"--coarse", "-cg", dest = "cg", 
 						help = "Provid the resolution of coarse graining. If 0, will run for all CG.", 
-						type = int, required = False, default = 10 )
+						type = int, required = False, default = 1 )
 
 
 	args = parser.parse_args()
