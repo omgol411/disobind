@@ -267,12 +267,12 @@ class Prediction():
 		ver = model_ver[-1]
 		model = get_model( model_config ).to( self.device )
 		model.load_state_dict( 
-							torch.load( f"../Models/{mod}/Version_{ver}/{params_file}.pth", 
+							torch.load( f"../models/{mod}/Version_{ver}/{params_file}.pth", 
 										map_location = self.device )
 							 )
 		model.eval()
 
-		cal_model = joblib.load( f"../Models/{mod}/Version_{ver}/{params_file}.pkl" )
+		cal_model = joblib.load( f"../models/{mod}/Version_{ver}/{params_file}.pkl" )
 
 		return model, cal_model
 
