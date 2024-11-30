@@ -63,7 +63,7 @@ Run the following command to use Disobind for the example case with default sett
 python run_disobind.py -f ./example/test.csv 
 ```
 
-By default, Disobind provides interface predictions at a coarse-grained (CG) resolution 10.
+By default, Disobind provides interface predictions at a coarse-grained (CG) resolution 1.
 
 ### Other options
 | Flags  |                                     Description                                                                           |
