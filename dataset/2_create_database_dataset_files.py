@@ -989,22 +989,26 @@ class parse_pdbs_for_idrs():
 	def where_the_magic_happens( self, data ):
 		"""
 		Data obtained from PDB - entity IDs, asym IDs, auth asym IDs, Uniprot IDs.
-		Remove entity or chain (see below) if:
+		
+		Identify IDRs for each chain in each entity in the PDB.
+			Remove missing residues from Uniprot and PDB mappings --> this creates fragments.
+			
+			Remove fragments < min len.
+			If lengtn of fragments > max len, further break them down.
+
+			Identify IDRs in each fragment by overlapping the fragment with disordered regions 
+			from DisProt/IDEAL/MobiDB.
+			A fragment is considered as IDR (prot1), if it has >= self.min_disorder_percent disordered residues.
+			Else considered as not disordered (prot2).
+
+		Remove the entry if no IDRs found.
+
+		Remove entity or chain if:
 				Chain not mapped.
 				Mismatch in the no. of mapped PDB and Uniprot fragments.
 				Mismatch in the length of mapped PDB and Uniprot fragments.
-		Identify IDRs for each chain in each entity in the PDB.
-			Remove missing residues form Uniprot and PDB mappings --> this creates fragments.
-			Remove fragments < min len.
-			If lengtn of fragments > 250(max len), further break them into halves.
-			Identify IDRs in each fragment by overlapping the fragemnt with disordered regions 
-				from DisProt/IDEAL/MobiDB --> prot1(disordered).
-				A fragment is considered as IDR, if it has >= self.min_disorder_percent disordered residues.
-					Else considered as prot2(not disordered).
-			Fragments with no overlap are considered as prot2(not disordered).
-		Remove the entry if no IDRs found.
 		
-		We consider all Uniprot IDs for all chains in an entity.
+		NOTE: We consider all Uniprot IDs for all chains in an entity.
 		Some entity may have >1 Uniprot ID.
 			These correspond to the same protein, since we already removed chimeras.
 			We assume the 1st one to be representative, while we use all of these 
