@@ -1,4 +1,4 @@
-## Model training
+# Model training
 For training the model, move to `src` directory.  
 
 Specify the configurations in the `model_versions.py` file and run to create a CONFIG_FILE:  

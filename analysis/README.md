@@ -15,11 +15,10 @@ Check all the paths in the constructor before running the script.
 
 This script creates a dictionary containing the following outputs for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10):
 
-1. Uncalibrated Disobind predictions
-2. Calibrated Disobind predictions
-3. Binary target masks
-4. Binary mask of interactions between disordered residues (IDR-IDR interactions; disorder_mat1) 
-5. Binary mask of interactions between disordered residues and any other residues (IDR-any interactions; disorder_mat2)
+1. Disobind predictions
+2. Binary target masks
+3. Binary mask of interactions between disordered residues (IDR-IDR interactions; disorder_mat1) 
+4. Binary mask of interactions between disordered residues and any other residues (IDR-any interactions; disorder_mat2)
 
 ## AF2/AF3 predictions
 

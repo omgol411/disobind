@@ -87,98 +87,15 @@ This script outputs the following files:
 
 
 ## Dataset creation
-Move to the `dataset` directory.  
-
-1. Obtain all PDB IDs from databases of disordered proteins including DIBS, MFIB, FuzDB, PBDtot, PDBcdr, DisProt, IDEAL, MobiDB.
-```
-python 1_disobind_database.py -c 250
-```
-
-2. Download all PDB files, obtain relevant info and create binary complexes with the first protein being disordered.
-```
-python 2_create_database_dataset_files.py -c 250
-```
-
-3. Create merged binary complexes.
-```
-python 3_create_merged_binary_complexes.py -c 200
-```
-
-
-4. Create training and OOD test set.
-```
-python 4_create_non_redundant_dataset.py -c 100
-```
-
-5. Obtain embeddings for the dataset and split into Train:Dev:Test set.
-```
-python create_input_embeddings.py
-```
+Follow the steps as specified in `./dataset/`.  
 
 
 ## Model training
-For training the model, move to `src` directory.  
-
-Specify the configurations in the `model_versions.py` file and run to create a CONFIG_FILE:  
-```
-python model_versions.py
-```
-
-Next, start model training using:
-```
-python hparams_search.py -f [CONFIG_FILE] -m manual
-```
+Follow the steps as specified in `./src/`.  
 
 
 ## Analysis
-Move to the `analysis` directory.  
-
-Disobind analysis occurs in 3 steps:
-1. Get Disobind predictions on the OOD set.
-2. Get AF2/AF3 predictions on the OOD set.
-3. Perform analysis (calculate metrics on OOD, create calibration plots, etc.) using Disobind and AF2/AF3 predictions.
-
-### Disobind predictions
-Run the following script on the terminal:
-```
-python predict.py
-```
-Check all the paths in the constructor before running the script.  
-
-This script creates a dictionary containing the following outputs for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10):
-
-1. Uncalibrated Disobind predictions
-2. Calibrated Disobind predictions
-3. Binary target masks
-4. Binary mask of interactions between disordered residues (IDR-IDR interactions; disorder_mat1) 
-5. Binary mask of interactions between disordered residues and any other residues (IDR-any interactions; disorder_mat2)
-
-### AF2/AF3 predictions
-
-Run the following script on the terminal, specify `self.af_model` in the constructor:
-```
-python get_af_prediction.py
-```
-Check all the paths in the constructor before running the script.  
-
-The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
-The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
-
-### Perform analysis
-Run the following script on the terminal:
-
-```
-python analysis.py
-```
-
-Check all the paths in the constructor before running the script.  
-
-This script parses Disobind/AF2/AF3 predicted outputs for all tasks and all CG values. Following outputs are generated:
-1. OOD set metrics.
-2. OOD set calibration plots and raw data for the plots. 
-3. AF2 vs AF3 confidence plot and raw data for the plots. 
-4. Sparsity vs F1 score plot and raw data for the plots. 
-5. Predicted interfaces at CG 1 for case specific analysis in a .txt file.
+Follow the steps as specified in `./analysis/`.  
    
 
 ## Information
