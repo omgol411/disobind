@@ -715,10 +715,8 @@ def check_for_overlap( uni_pos1, uni_pos2, ignore_boundary = True ):
 	
 	Input:
 	----------
-	start1 --> first residue for entry1 (int).
-	start2 --> first residue for entry2 (int).
-	end1 --> last residue for entry1 (int).
-	end2 --> last residue for entry2 (int).
+	uni_pos1 --> (list) Uniprot positions for protein 1.
+	uni_pos2 --> (list) Uniprot positions for protein 2.
 	ignore_boundary --> if True, ignore overlap if only boundary residue is present.
 		e.g. [1, 2, 3, 4] and [4, 5, 6, 7] --> no overlap if ignore_boundary is True.
 
