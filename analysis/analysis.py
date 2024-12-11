@@ -173,7 +173,7 @@ class JudgementDay():
 			counts = [0, 0, 0]
 			# All fields to be included for the results.
 			ood_dict = {key:[] for key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
-											"Disobind_uncal", "Disobind_cal", "Random_baseline", "masks", 
+											"Disobind_uncal", "Random_baseline", "masks", 
 											"disorder_mat1", "disorder_mat2", "targets"]}
 
 			# For all entries.
@@ -248,31 +248,25 @@ class JudgementDay():
 			af2_diso = np.max( af2_diso, axis = 1 ).reshape( b, m, n )
 			preds_dict["AF2_Disobind_uncal"] = torch.from_numpy( af2_diso )
 			
-			af2_diso = np.stack( [ood_dict["AF2_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_cal"].reshape( b, m*n )], axis = 1 )
-			af2_diso = np.max( af2_diso, axis = 1 ).reshape( b, m, n )
-			preds_dict["AF2_Disobind_cal"] = torch.from_numpy( af2_diso )
 
 			af3_diso = np.stack( [ood_dict["AF3_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_uncal"].reshape( b, m*n )], axis = 1 )
 			af3_diso = np.max( af3_diso, axis = 1 ).reshape( b, m, n )
 			preds_dict["AF3_Disobind_uncal"] = torch.from_numpy( af3_diso )
 
-			af3_diso = np.stack( [ood_dict["AF3_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_cal"].reshape( b, m*n )], axis = 1 )
-			af3_diso = np.max( af3_diso, axis = 1 ).reshape( b, m, n )
-			preds_dict["AF3_Disobind_cal"] = torch.from_numpy( af3_diso )
 			
 			# AF2/AF3 pLDDT+PAE corrected predictions for IDR-IDR and IDR-any interactions.
 			preds_dict["AF2_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 			preds_dict["AF3_IDR-IDR"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
+
+			preds_dict["AF2_Disobind_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_Disobind_uncal"]*ood_dict["disorder_mat1"] )
 			if "interaction" in task:
 				preds_dict["AF2_IDR-any"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
 				preds_dict["AF3_IDR-any"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
 			
 			# Disobind predictions for IDR-IDR and IDR-any interactions.
 			preds_dict["Disobind_uncal_IDR-IDR"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat1"] )
-			preds_dict["Disobind_cal_IDR-IDR"] = torch.from_numpy( ood_dict["Disobind_cal"]*ood_dict["disorder_mat1"] )
 			if "interaction" in task:
 				preds_dict["Disobind_uncal_IDR-any"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat2"] )
-				preds_dict["Disobind_cal_IDR-any"] = torch.from_numpy( ood_dict["Disobind_cal"]*ood_dict["disorder_mat2"] )
 
 			# now calculate the metrics for all predictions.
 			for key in preds_dict.keys():
@@ -288,15 +282,15 @@ class JudgementDay():
 				results_dict["Precision"].append( metrics[1] )
 				results_dict["F1-score"].append( metrics[2] )
 
-			if task == "interface_1":
-				# Create contact density vs interface 1 prediction plots.
-				self.create_performance_contactdensity_plots( entry_ids, 
-																preds_dict["Disobind_cal"], 
-																preds_dict["AF2_pLDDT_PAE"], 
-																ood_dict["targets"] )
+			# if task == "interface_1":
+			# 	# Create contact density vs interface 1 prediction plots.
+			# 	self.create_performance_contactdensity_plots( entry_ids, 
+			# 													preds_dict["Disobind_uncal"], 
+			# 													preds_dict["AF2_pLDDT_PAE"], 
+			# 													ood_dict["targets"] )
 
 			# Do for all tasks.
-			self.create_calibration_plots( preds_dict["Disobind_uncal"], preds_dict["Disobind_cal"], ood_dict["targets"], task )
+			# self.create_calibration_plots( preds_dict["Disobind_uncal"], preds_dict["Disobind_cal"], ood_dict["targets"], task )
 
 			# Just adding a empty row for separating different tasks.
 			for key in results_dict.keys():
@@ -312,9 +306,10 @@ class JudgementDay():
 		# Dump a subset of results o disk - for ease of looking.
 		subset_dict = {key:[] for key in results_dict.keys() if key not in ["AvgPrecision", "MCC", "AUROC", "Accuracy"]}
 		for i in range( len( results_dict["Model"] ) ):
-			if results_dict["Model"][i] in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE","Disobind_cal", 
-											"AF2_Disobind_cal", "AF3_Disobind_cal",
-											"AF2_IDR-IDR", "AF3_IDR-IDR", "Disobind_cal_IDR-IDR", "Disobind_cal_IDR-any", ""]:
+			if results_dict["Model"][i] in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE","Disobind_uncal", 
+											"AF2_Disobind_uncal", "AF3_Disobind_uncal",
+											"AF2_IDR-IDR", "AF3_IDR-IDR", "AF2_Disobind_uncal_IDR-IDR",
+											 "Disobind_uncal_IDR-IDR", "Disobind_uncal_IDR-any", ""]:
 				for key in subset_dict.keys():
 					subset_dict[key].append( results_dict[key][i] )
 
@@ -440,7 +435,7 @@ class JudgementDay():
 
 		f1 = []
 		for i in range( len( results_dict["Objective"] ) ):
-			if results_dict["Model"][i] == "Disobind_cal":
+			if results_dict["Model"][i] == "Disobind_uncal":
 				f1.append( results_dict["F1-score"][i] )
 
 		plt.plot( sparsity, f1, marker = "o", color = "blue" )
@@ -482,7 +477,7 @@ class JudgementDay():
 
 			id_ = f"{uni_id1}--{uni_id2}_{cp}"
 
-			diso_pred = self.disobind_preds[entry_id]["interface_1"]["Disobind_cal"]
+			diso_pred = self.disobind_preds[entry_id]["interface_1"]["Disobind_uncal"]
 			diso_pred = np.where( diso_pred >= self.contact_threshold, 1, 0 )
 
 			af2_pred = self.af2m_preds[entry_id]["interface_1"]["AF2_pLDDT_PAE"]
