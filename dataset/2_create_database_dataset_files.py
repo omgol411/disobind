@@ -285,11 +285,9 @@ class parse_pdbs_for_idrs():
 
 	def dataset_module( self ):
 		"""
-		Consists of 3 stages:
+		Consists of 2 stages:
 			1. Identify disordered and ordered chains in PDB - self.parallelize_dataset_creation().
 			2. Split non-binary complexes into binary complexes - create_binary_complexes().
-			3. Segregate all binary complexes into non-overlapping sets and save - 
-												parallelize_nonoverlapping_sets_creation().
 
 		Input:
 		----------
