@@ -1049,7 +1049,7 @@ class parse_pdbs_for_idrs():
 					entry_dict[pdb][key1][key2] = []
 
 			# Ignore PDBs with no. of chains >= self.max_num_chains.
-			if len( all_asym_ids ) >= self.max_num_chains:
+			if self.max_num_chains != 0 and len( all_asym_ids ) >= self.max_num_chains:
 				logs_dict[f">{self.max_num_chains}_chains_in_pdb"].append( pdb )
 
 			else:
