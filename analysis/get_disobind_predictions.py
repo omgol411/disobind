@@ -272,9 +272,8 @@ class Prediction():
 							 )
 		model.eval()
 
-		cal_model = joblib.load( f"../models/{mod}/Version_{ver}/{params_file}.pkl" )
 
-		return model, cal_model
+		return model
 
 
 	def apply_settings( self, obj, cg ):
@@ -296,7 +295,7 @@ class Prediction():
 		model --> model corresponding to the specified settings. 
 		"""
 		print( f"\nLoading model for {obj}: CG = {cg}..." )
-		model, cal_model = self.load_model( *self.parameters[obj][cg] )
+		model = self.load_model( *self.parameters[obj][cg] )
 
 		if "interaction" in obj:
 			self.objective[0] = "interaction"
@@ -315,7 +314,7 @@ class Prediction():
 			self.objective[2] = True
 		else:
 			self.objective[2] = False
-		return model, cal_model
+		return model
 
 
 	def get_input_tensors( self, key, prot1, prot2, target ):
@@ -581,7 +580,7 @@ class Prediction():
 				
 				# For all coarse grainings.
 				for cg in self.parameters[obj].keys():
-					model, cal_model = self.apply_settings( obj, cg )
+					model = self.apply_settings( obj, cg )
 
 					prot1, prot2, target, target_mask, eff_len = self.get_input_tensors( key, prot1_emb, prot2_emb, target_cmap )
 					
@@ -594,28 +593,11 @@ class Prediction():
 
 					_, cg = cg.split( "_" )
 					uncal_output = uncal_output.detach().cpu().numpy()
-					# get calibrated model predictions.
-					n, h = uncal_output.shape
-					cal_output = cal_model.predict( uncal_output.flatten() )
-					cal_output = cal_output.reshape( n, h )
-					target_mask = target_mask.detach().cpu().numpy().reshape( n, h )
-					cal_output = cal_output*target_mask
 
 					disorder_mat1, disorder_mat2 = self.get_disorder_matrix( key, obj, cg )
-
-					# Some Sanity checks.
-					if cal_output.shape != uncal_output.shape:
-						raise Exception( f"Mismatch in uncalibrated and calibrated output dimension - {uncal_output.shape}  {cal_output.shape}..." )
-					
-					elif cal_output.shape != disorder_mat1.shape:
-						raise Exception( f"Mismatch in output and disorder matrix dimension - {cal_output.shape}  {disorder_mat1.shape}..." )
-					
-					elif cal_output.shape != target_mask.shape:
-						raise Exception( f"Mismatch in calibrated output and target mask dimension - {cal_output.shape}  {target_mask.shape}..." )
 					
 					self.predictions[key][f"{obj}_{cg}"] = {
 													"Disobind_uncal": uncal_output,
-													"Disobind_cal": cal_output,
 													"masks": target_mask,
 													"disorder_mat1": disorder_mat1,
 													"disorder_mat2": disorder_mat2,
