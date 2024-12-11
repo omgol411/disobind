@@ -77,7 +77,7 @@ class Prediction():
 		# Test contact maps file name.
 		self.cmaps_file =  f"../database/v_{self.version}/Output_bcmap_test_v_{self.version}.h5"
 		# Uniprot file name.
-		self.Uniprot_seq_file =  f"../disobind_archive/database/v_{self.version}/Uniprot_seq.json"
+		self.Uniprot_seq_file =  f"../database/v_{self.version}/Uniprot_seq.json"
 		# self.output_dir = f"Predictions_{self.mod}_{self.mod_ver}"
 		# Name for output directory.
 		if self.mode == "ood":
