@@ -286,7 +286,7 @@ class Trainer (nn.Module):
 			uncal_preds = uncal_preds.flatten()
 			target = target.flatten()
 			mask = mask.flatten()
-			cal_model = self.calibrate_model( uncal_preds*mask, target*mask )
+			self.calibrate_model( uncal_preds*mask, target*mask )
 				
 
 		return batch_dict
@@ -355,6 +355,8 @@ class Trainer (nn.Module):
 		##############------------------##############
 		batch_dict = np.array( [] )
 
+		uncal_preds, target, mask = [], [], []
+
 		batch_size = 0
 		with torch.no_grad():
 			for batch in dev_set:
@@ -363,6 +365,16 @@ class Trainer (nn.Module):
 				dev_pred, dev_target, dev_mask = self.predict( batch )
 
 				dev_loss, dev_metrics, dev_pred, dev_target, dev_mask = self.calculate_loss_n_metrics( dev_pred, dev_target, dev_mask )
+
+				if epoch == self.max_epochs - 1:
+					if len( uncal_preds ) == 0:
+						uncal_preds = dev_pred
+						target = dev_target
+						mask = dev_mask.detach().cpu().numpy()
+					else:
+						uncal_preds = np.concatenate( ( uncal_preds, dev_pred ), axis = 0 )
+						target = np.concatenate( ( target, dev_target ), axis = 0 )
+						mask = np.concatenate( ( mask, dev_mask.detach().cpu().numpy() ), axis = 0 )
 				
 				# Keep logs for all the batches
 				batch_dict = np.append( batch_dict, dev_loss.item() )
@@ -375,6 +387,13 @@ class Trainer (nn.Module):
 													dev_metrics[6].item()] )
 
 		batch_dict = batch_dict.reshape( batch_size, self.num_metrics + 1 )
+
+		if epoch == self.max_epochs - 1:
+			uncal_preds = uncal_preds.flatten()
+			target = target.flatten()
+			mask = mask.flatten()
+			self.calibrate_model( uncal_preds*mask, target*mask )
+
 
 		return batch_dict
 
