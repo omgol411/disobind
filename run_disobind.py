@@ -523,10 +523,7 @@ class Disobind():
 							 )
 		model.eval()
 
-		# Load calibration model.
-		cal_model = joblib.load( f"{self.model_dir}{mod}/Version_{ver}/{params_file}.pkl" )
-
-		return model, cal_model
+		return model
 
 
 
@@ -549,7 +546,7 @@ class Disobind():
 		model --> model corresponding to the specified settings. 
 		"""
 		print( f"\nLoading model for {obj}: CG = {cg}..." )
-		model, cal_model = self.load_model( *self.parameters[obj][cg] )
+		model = self.load_model( *self.parameters[obj][cg] )
 
 		if "interaction" in obj:
 			self.objective[0] = "interaction"
@@ -568,7 +565,7 @@ class Disobind():
 			self.objective[2] = True
 		else:
 			self.objective[2] = False
-		return model, cal_model
+		return model
 
 
 
@@ -645,7 +642,7 @@ class Disobind():
 				pair_id: {
 						entry_id: {
 							{obj}_{cg}: {
-									"Disobind_cal",
+									"Disobind_uncal",
 									"Final preds",
 							}
 						}
@@ -692,7 +689,7 @@ class Disobind():
 					if f"{obj}_{cg.split( '_' )[1]}" not in required_tasks:
 						continue
 					
-					model, cal_model = self.apply_settings( obj, cg )
+					model = self.apply_settings( obj, cg )
 
 					prot1, prot2, target, target_mask, eff_len = self.get_input_tensors( 
 																						prot1 = prot1_emb, 
@@ -714,13 +711,6 @@ class Disobind():
 
 					_, cg = cg.split( "_" )
 
-					# get calibrated model predictions.
-					n, h = uncal_output.shape
-					cal_output = cal_model.predict( uncal_output.flatten() )
-					cal_output = cal_output.reshape( n, h )
-					target_mask = target_mask.reshape( n, h )
-					cal_output = cal_output*target_mask
-
 					# Get AF2 pred for the entry.
 					model_file, pae_file = af_paths[entry_id]
 					# If AF2 input is not provided.
@@ -730,15 +720,15 @@ class Disobind():
 
 						# Get Disobind+AF2 output.
 						m, n = cal_output.shape
-						af2_diso = np.stack( [cal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
+						af2_diso = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
 						output = np.max( af2_diso, axis = 1 ).reshape( m, n )
 					else:
-						output = cal_output
+						output = uncal_output
 
 					output, df = self.extract_model_output( entry_id, output, eff_len )
 					
 					predictions[pair_id][entry_id][f"{obj}_{cg}"] = {
-																	"Disobind_cal": np.float32( cal_output ),
+																	"Raw_Preds": np.float32( output ),
 																	"Final_preds": df
 																		}
 					print( f"{idx} ------------------------------------------------------------\n" )
