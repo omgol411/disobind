@@ -1,9 +1,3 @@
-~~#TODO folder names: caps and small~~  
-#TODO  : separate the predictions from disobind training and dataset creatation  
-~~#TODO add how to run with AF2 . Mention that default is without.~~  
-~~#TODO interface 1 is the default~~  
-~~#TODO example with multiple rows, AF.~~  
-~~#TODO have outputs of example.~~  
 
 [![PubMed](https://salilab.org/imp-systems/static/images/pubmed.png)]()
 
@@ -11,6 +5,10 @@
 
 # Disobind
 Disobind is a deep learning method for predicting inter-protein contact maps and interface residues for an IDR and its binding partner from their sequences. 
+
+
+![main_fig](Fig_2.png)
+
 
 ## Publication and Data
 * Kartik Majila, Varun Ullanat, Shruthi Viswanath, __Disobind: __, [DOI]().
