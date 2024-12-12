@@ -9,7 +9,7 @@ Disobind analysis occurs in 3 steps:
 ## Disobind predictions
 Run the following script on the terminal:
 ```
-python predict.py
+python get_disobind_predictions.py
 ```
 Check all the paths in the constructor before running the script.  
 
