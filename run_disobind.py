@@ -719,7 +719,7 @@ class Disobind():
 						af2_pred = self.process_af2_pred( af2_pred )
 
 						# Get Disobind+AF2 output.
-						m, n = cal_output.shape
+						m, n = uncal_output.shape
 						af2_diso = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
 						output = np.max( af2_diso, axis = 1 ).reshape( m, n )
 					else:
