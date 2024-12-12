@@ -41,10 +41,9 @@ python analysis.py
 Check all the paths in the constructor before running the script.  
 
 This script parses Disobind/AF2/AF3 predicted outputs for all tasks and all CG values. Following outputs are generated:
-1. OOD set metrics.
-2. OOD set calibration plots and raw data for the plots. 
-3. AF2 vs AF3 confidence plot and raw data for the plots. 
-4. Sparsity vs F1 score plot and raw data for the plots. 
-5. Predicted interfaces at CG 1 for case specific analysis in a .txt file.
+1. OOD set metrics in a CSV file format.
+2. AF2 vs AF3 confidence plot and raw data for the plots. 
+3. Sparsity vs F1 score plot and raw data for the plots. 
+4. Predicted interfaces at CG 1 for case specific analysis in a .txt file.
    
 
