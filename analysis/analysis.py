@@ -9,6 +9,8 @@ import os
 import torch
 from torch import nn
 
+from dataset.utility import ranges
+
 from src.metrics import torch_metrics
 from src.utils import plot_reliabity_diagram
 
@@ -51,12 +53,11 @@ class JudgementDay():
 		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.version}.csv"
 		
 		# Files for the plots and raw data.
-		self.interface_plots_file = f"{self.output_dir}OOD_plots_{self.version}"
 		self.af_conf_pred_counts_file = f"{self.output_dir}Confident_AF_preds_{self.version}.txt"
 		self.af_confidence_file = f"{self.output_dir}AF_confidence_plot_{self.version}"
 		self.af_confidence_scores = f"{self.output_dir}AF_confidence_scores_{self.version}.csv"
 		self.sparsity_file = f"{self.output_dir}Sparsity_F1_plot_{self.version}"
-		self.contact_density_file = f"{self.output_dir}Contact_density_Metrics_{self.version}"
+		self.case_specific_analysis_file = f"{self.output_dir}Case_sp_analysis_{self.version}"
 		self.top_preds_diso_af2_file = f"{self.output_dir}Top_preds_Diso_AF2_{self.version}"
 		self.top_preds_file = f"{self.output_dir}Top_preds_{self.version}"
 
@@ -258,7 +259,7 @@ class JudgementDay():
 			preds_dict["AF2_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 			preds_dict["AF3_IDR-IDR"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 
-			preds_dict["AF2_Disobind_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_Disobind_uncal"]*ood_dict["disorder_mat1"] )
+			preds_dict["AF2_Disobind_IDR-IDR"] = torch.from_numpy( af2_diso*ood_dict["disorder_mat1"] )
 			if "interaction" in task:
 				preds_dict["AF2_IDR-any"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
 				preds_dict["AF3_IDR-any"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
