@@ -85,15 +85,15 @@ This script outputs the following files:
 
 
 ## Dataset creation
-Follow the steps as specified in `./dataset/`.  
+Follow the steps as specified in [dataset](./dataset/README.md).  
 
 
 ## Model training
-Follow the steps as specified in `./src/`.  
+Follow the steps as specified in [src](./src/README.md).  
 
 
 ## Analysis
-Follow the steps as specified in `./analysis/`.  
+Follow the steps as specified in [analysis](./analysis/README.md).  
    
 
 ## Information
