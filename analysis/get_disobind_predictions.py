@@ -601,10 +601,6 @@ class Prediction():
 													"masks": target_mask,
 													"disorder_mat1": disorder_mat1,
 													"disorder_mat2": disorder_mat2,
-													"prot1_aa_mask": self.aa_masks[key]["prot1"],
-													"prot2_aa_mask": self.aa_masks[key]["prot1"],
-													"prot1_slims_mask": self.slims_masks[key]["prot1"],
-													"prot2_slims_mask": self.slims_masks[key]["prot1"]
 														}
 
 					print( f"{idx} ------------------------------------------------------------\n" )

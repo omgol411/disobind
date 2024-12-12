@@ -239,7 +239,7 @@ class JudgementDay():
 
 			# Obtain all raw predictions and combinations of predictions to be tested.
 			for key in ood_dict.keys():
-				if key not in ["masks", "disorder_mat1", "disorder_mat2", "disorder_promoting_aa", "slims", "targets"]:
+				if key not in ["masks", "disorder_mat1", "disorder_mat2", "targets"]:
 					preds_dict[key] = torch.from_numpy( ood_dict[key] )
 
 			# AF2/AF3 pLDDT+PAE corrected predictions combined with Disobind predictions.
