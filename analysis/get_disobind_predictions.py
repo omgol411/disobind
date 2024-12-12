@@ -18,7 +18,7 @@ import torch
 from torch import nn
 
 import dataset
-from dataset.from_APIs_with_love import ( get_uniprot_seq, get_motifs_from_elm )
+from dataset.from_APIs_with_love import get_uniprot_seq
 from dataset.utility import ( consolidate_regions, find_disorder_regions, load_disorder_dbs )
 from dataset.create_input_embeddings import Embeddings
 from src.models.get_model import get_model
@@ -44,8 +44,10 @@ class Prediction():
 		"""
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
+		# Dataset version,or ood mode.
+		self.version = 19
 		# Input file containing the prot1/2 headers.
-		self.input_file = "../database/v_19/prot_1-2_test_v_19.csv"
+		self.input_file = f"../database/v_19/prot_1-2_test_v_{self.version}.csv"
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
@@ -56,6 +58,7 @@ class Prediction():
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
+		self.mode = "ood"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
@@ -84,10 +87,6 @@ class Prediction():
 			self.output_dir = f"Predictions_ood_v{self.version}"
 			# Filename to store predictions.
 			self.output_filename = "Disobind_Predictions.npy"
-		elif self.mode == "ped":
-			self.output_dir = f"Predictions_ped"
-			# Filename to store predictions.
-			self.output_filename = "PED_Predictions.npy"
 		else:
 			self.output_dir = f"Disobind_Predictions"
 			# Filename to store predictions.
@@ -100,7 +99,7 @@ class Prediction():
 			os.makedirs( self.output_dir, exist_ok = True )
 		
 		# Absolute path to the analysis dir.
-		self.abs_path = os.path.abspath( "disobind/analysis/" )
+		self.abs_path = os.path.abspath( "./" )
 		# Path fo the FASTA file for prot1/2 sequences.
 		self.fasta_file = f"{self.abs_path}/{self.output_dir}/p1_p2_test.fasta"
 		# Path fo the h5 file for prot1/2 embeddings.
@@ -593,6 +592,7 @@ class Prediction():
 
 					_, cg = cg.split( "_" )
 					uncal_output = uncal_output.detach().cpu().numpy()
+					target_mask = target_mask.detach().cpu().numpy().reshape( uncal_output.shape )
 
 					disorder_mat1, disorder_mat2 = self.get_disorder_matrix( key, obj, cg )
 					

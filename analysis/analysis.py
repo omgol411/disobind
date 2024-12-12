@@ -259,7 +259,7 @@ class JudgementDay():
 			preds_dict["AF2_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 			preds_dict["AF3_IDR-IDR"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 
-			preds_dict["AF2_Disobind_IDR-IDR"] = torch.from_numpy( af2_diso*ood_dict["disorder_mat1"] )
+			preds_dict["AF2_Disobind_uncal_IDR-IDR"] = torch.from_numpy( af2_diso*ood_dict["disorder_mat1"] )
 			if "interaction" in task:
 				preds_dict["AF2_IDR-any"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
 				preds_dict["AF3_IDR-any"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
