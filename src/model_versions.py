@@ -18,9 +18,8 @@ Use the following script to define the model configurations for model training.
 dataset_version = 19
 # Select from models in src/models/
 model = "Epsilon_3" 
-emb = "T5"             # ["T5", "ProstT5", "ProSE"]
+emb = "T5"             # ["T5", "ProstT5", "ProSE", "BERT"]
 emb_type = "global"    # ["global", "local"]
-# model_type = "vanilla" # ["vanilla", "correction, "inverse", "meta"]
 # ["obj", "bin_size", "pool type", "bin_post_proj", "bin_input", "single_output"]
 #       obj --> ["interaction", "interface", "interaction_bin", "interface_bin"]
 objective = ["interface_bin", 10, "avg", False, True, False]
@@ -35,12 +34,11 @@ objective is list of 4 elements:
     obj --> ["interaction", "interface", "interaction_bin", "interface_bin"]
     CG --> [1, 5, 10]
     pool --> "avg"/"max" -- only using avg.
-    bin_post_proj --> bin embeddings post projection block -- deprecated.
+    bin_post_proj --> bin embeddings post projection block. -- deprecated
     bin_input --> Set to true for CG tasks else False.
-    single_output --> deprecated. Leave it to False.
+    single_output --> deprecated. Leave it to False. -- deprecated.
 """
 
-# While using Optuna, provide categorical inputs as a list and continous inputs as a list containing start and end param values.
 data = {
     "Version": "5",
     "Embedding": f"{emb}",
@@ -63,11 +61,12 @@ data = {
             #       aggregate --> ["add", "substract", "multiply", "op-od", "dot", "cosine"]
             #       concatenate --> ["vanilla", "conact"]
             #       interface --> ["avg1d", "avg2d", "lin"]
-            #       placement --> ["pre_proj", "post_concat", "post_hid", "post_out"]
-            "input_layer": ["op-od", "vanilla", "lin"],
+            #       placement --> ["pre_proj", "post_concat", "post_hid", "post_out"] --> deprecataed
+            # "input_layer": ["op-od", "vanilla", ""],     # Uncomment for contact map model training
+            "input_layer": ["op-od", "vanilla", "lin"],  # Uncomment for interface model training
             # For Monte carlo dropout. #samples to be taken.
             "num_samples": 0,
-            # ["#US_layers", "#DS_layers", "num_blocks", "scale_factor"", 
+            # ["#US_layers", "#DS_layers", "num_blocks", "scale_factor", 
             #               "hidden_block_type - vanilla/residual", 
             #               "residual_connection -- vanilla/addnorm/addactivnorm"]
             "num_hid_layers": [[0, 0, 0, 0, "vanilla", ""]],
@@ -114,7 +113,7 @@ data = {
             "amsgrad": True,
             "weight_decay": [0.05],
             # calibration methods - beta-abm, platt, temp, None.
-            "calibration": "beta-abm",
+            "calibration": "None",
             # For gradient clipping.
             "max_norm": None,
             "learning_rate": [1e-4],
@@ -140,7 +139,7 @@ data = {
             "contact_threshold": [0.5],
             "save_model": True,
             "model_path": f"model_{emb_type}",
-            "optuna_trials": 0
+            "optuna_trials": 0  # deprecated
             }
         }
     }
