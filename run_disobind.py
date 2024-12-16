@@ -428,10 +428,6 @@ class Disobind():
 		"""
 		For all input pairs, convert them into a uniform format:
 			UniID1:start1:end1--UniID2:start2:end2_num
-		If residue positions for protein 1/2 are not provided, 
-				break the sequence into non-overlapping 100 residue long fragments.
-			For protein 1, select only IDR containing fragments identified based on annotations from DisProt/ IDEAL/ MobiDB.
-			For protein 2, select all fragments.
 
 		Input:
 		----------
