@@ -1,4 +1,4 @@
-Version: '0'
+Version: '6.2'
 Embedding: T5
 Emb_type: global
 Model: Epsilon_3
