@@ -495,6 +495,7 @@ class parse_pdbs_for_idrs():
 		mapped_pdb_pos_uni_basis = []
 		uni_pos_frags, pdb_pos_frags = [], []
 		for idx in range( len( pdb_pos_no_nulls ) ):
+			# Note: this implementation may miss some fragments in case a <min_len fragment is in the middle.
 			if len( pdb_pos_no_nulls[idx] ) < self.min_len:
 				uni_pos_frags, pdb_pos_frags = [], []
 			
