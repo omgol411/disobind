@@ -187,6 +187,17 @@ class JudgementDay():
 				if key1 == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
 					continue
 
+				u1, u2 = key1.split( "--" )
+				u1 = u1.split( ":" )[0]
+				u2, c = u2.split( "_" )
+				u2 = u2.split( ":" )[0]
+
+				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
+				# 	Ignoring these from evaluation.
+				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
+										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0", "O85041--O85043_0", "P25024--P10145_0"]:
+					continue
+
 				entry_ids.append( key1 )
 
 				# For all fields in the prediction dict.
@@ -340,6 +351,17 @@ class JudgementDay():
 		selected_entries = []
 		for key in self.af2m_preds.keys():
 			if key == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+				continue
+
+			u1, u2 = key1.split( "--" )
+			u1 = u1.split( ":" )[0]
+			u2, c = u2.split( "_" )
+			u2 = u2.split( ":" )[0]
+
+			# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
+			# 	Ignoring these from evaluation.
+			if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
+									"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0", "O85041--O85043_0", "P25024--P10145_0"]:
 				continue
 
 			selected_entries.append( key )
@@ -524,9 +546,6 @@ class JudgementDay():
 			w.writelines( f"Target prot1 interface: {','.join( uni_pos1 )}\n" )
 			w.writelines( f"Target prot2 interface: {','.join( uni_pos2 )}\n" )
 
-			hf = h5py.File( f"{self.merged_binary_complexes_dir}{id_}.h5" )
-			pdbs = np.array( hf["merged_entries"] )
-			print( pdbs )
 			w.writelines( "\n-----------------------------------------------\n" )
 		w.close()
 
