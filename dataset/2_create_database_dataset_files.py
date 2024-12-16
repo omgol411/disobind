@@ -1046,150 +1046,150 @@ class parse_pdbs_for_idrs():
 				for key2 in ["Asym ID", "Auth Asym ID", "Uniprot ID", "Uniprot positions", "PDB positions"]:
 					entry_dict[pdb][key1][key2] = []
 
-			# Ignore PDBs with no. of chains >= self.max_num_chains.
-			if self.max_num_chains != 0 and len( all_asym_ids ) >= self.max_num_chains:
-				logs_dict[f">{self.max_num_chains}_chains_in_pdb"].append( pdb )
+			# # Ignore PDBs with no. of chains >= self.max_num_chains.
+			# if self.max_num_chains != 0 and len( all_asym_ids ) >= self.max_num_chains:
+			# 	logs_dict[f">{self.max_num_chains}_chains_in_pdb"].append( pdb )
 
-			else:
+			# else:
+			# <=======================================================> #
+			# Get the mapping for the PDB.
+			mapped_pdb_file = f"{self.mapped_PDB_path}{pdb.lower()}.tsv"
+			mapping = pd.read_csv( mapped_pdb_file, sep = "\t", header = None )
+
+			chain_ids_p1, chain_ids_p2 = [[], []], [[], []]
+			uni_ids_p1, uni_ids_p2 = [], []
+			uni_pos_p1, uni_pos_p2 = [], []
+			pdb_pos_p1, pdb_pos_p2 = [], []
+
+			# <=======================================================> #
+			# For all entity IDs.
+			for i in range( len( all_entity_ids ) ):
+				s1 = time.time()
+				asym_id = all_asym_ids[i]
+				auth_asym_id = all_auth_asym_ids[i]
+
+				# Representative Uni ID must not be obsolete/invalid.
+				uniprot_ids = set( all_uniprot_ids[i].split( "," ) )
+				tmp = [id_ for id_ in uniprot_ids if id_ in self.uniprot_seq.keys()]
+				uni_id = tmp[0]
+
 				# <=======================================================> #
-				# Get the mapping for the PDB.
-				mapped_pdb_file = f"{self.mapped_PDB_path}{pdb.lower()}.tsv"
-				mapping = pd.read_csv( mapped_pdb_file, sep = "\t", header = None )
+				# Get the mapped Uniprot and PDB seq for the chain.
+				mapping_dict, _ = get_sifts_mapping( mapping = mapping, 
+													chain1 = auth_asym_id, 
+													uni_id1 = uniprot_ids )
 
-				chain_ids_p1, chain_ids_p2 = [[], []], [[], []]
-				uni_ids_p1, uni_ids_p2 = [], []
-				uni_pos_p1, uni_pos_p2 = [], []
-				pdb_pos_p1, pdb_pos_p2 = [], []
+				# Remove the chain if the mapping does not contain the apt chain ID.
+				# 	We only consider mapping for the PDB specified Uniprot ID -- at SIFTS level.
+				if mapping_dict["uni_pos"] == []:
+					logs_dict["chain_not_mapped"].append( f"{pdb}_{auth_asym_id}__{uni_id}" )
+					continue
+
+				mapped_uni_pos = mapping_dict["uni_pos"]
+				mapped_pdb_pos = mapping_dict["pdb_pos"]
 
 				# <=======================================================> #
-				# For all entity IDs.
-				for i in range( len( all_entity_ids ) ):
-					s1 = time.time()
-					asym_id = all_asym_ids[i]
-					auth_asym_id = all_auth_asym_ids[i]
+				## Remove "nulls"/nan.
+				## Get the mapped Uniprot and PDB fragments.
+				uni_pos_frags, pdb_pos_frags = self.remove_missing_residues( mapped_uni_pos, mapped_pdb_pos )
 
-					# Representative Uni ID must not be obsolete/invalid.
-					uniprot_ids = set( all_uniprot_ids[i].split( "," ) )
-					tmp = [id_ for id_ in uniprot_ids if id_ in self.uniprot_seq.keys()]
-					uni_id = tmp[0]
+				# If < self.min_len residues left in the fragment.
+				if len( pdb_pos_frags ) == 0:
+					self.logger[f"#residues<{self.min_len}"].append( f"{pdb}_{asym_id}" )
+					continue
 
-					# <=======================================================> #
-					# Get the mapped Uniprot and PDB seq for the chain.
-					mapping_dict, _ = get_sifts_mapping( mapping = mapping, 
-														chain1 = auth_asym_id, 
-														uni_id1 = uniprot_ids )
+				if self.fragment_exceeding_maxlen:
+					# If fragment length > max_len, break it into 2 halves.
+					uni_pos_frags = self.fragment_chain( uni_pos_frags )
+					pdb_pos_frags = self.fragment_chain( pdb_pos_frags )
 
-					# Remove the chain if the mapping does not contain the apt chain ID.
-					# 	We only consider mapping for the PDB specified Uniprot ID -- at SIFTS level.
-					if mapping_dict["uni_pos"] == []:
-						logs_dict["chain_not_mapped"].append( f"{pdb}_{auth_asym_id}__{uni_id}" )
+				# Ignore if the no. of uni fragments does not match no. of pdb fragments.
+				if len( uni_pos_frags ) != len( pdb_pos_frags ):
+					if f"{pdb}_{auth_asym_id}" not in logs_dict["mismatch_in_num_uni/pdb_frags"]:
+						# mismatch_frags.append( pdb )
+						logs_dict["mismatch_in_num_uni/pdb_frags"].append( 
+									f"{pdb}_{auth_asym_id}" 
+									)
+					continue
+
+				# Remove fragments if the length of uniprot and pdb frags do not match.
+				# This may have occured due to problems in mapping e.g. 5nrl, 7jij.
+				uni_pos_frags_, pdb_pos_frags_ = [], []
+				mismatch_found = False
+				
+				for uni_frag, pdb_frag in zip( uni_pos_frags, pdb_pos_frags ):
+					if len( uni_frag ) != len( pdb_frag ):
+						mismatch_found = True
+						continue
+					else:
+						uni_pos_frags_.append( uni_frag )
+						pdb_pos_frags_.append( pdb_frag )
+				
+				if mismatch_found:
+					uni_pos_frags, pdb_pos_frags = uni_pos_frags_, pdb_pos_frags_
+					del uni_pos_frags_
+					del pdb_pos_frags_
+					# mismatch_frag_lengths.append( pdb )
+					logs_dict["mismatch_in_uni/pdb_frag_lengths"].append( 
+									f"{pdb}_{auth_asym_id}"
+									 )
+
+				# <=======================================================> #
+				## Get all disordered regions from DisProt/IDEAL.					
+				disorder_regions = find_disorder_regions( disprot = self.disprot, 
+															ideal = self.ideal, 
+															mobidb = self.mobidb, 
+															uni_ids = uniprot_ids, 
+															min_len = 1,
+															return_ids = False )
+				
+				# For all the fragments.
+				for idx in range( len( uni_pos_frags ) ):
+					# Overlap mapped_uni_pos with disorder regions on DisProt/IDEAl.
+					# Consider fragments as disordered if atleast min_disorder_percent
+					# 		disordered residues are present.
+					if len( uni_pos_frags[idx] ) > self.max_len:
+						raise Exception( "Fragment exceeds max length..." )
+
+					# Remove fragments if the Uniprot residues are not continous.
+					uni_pos = ranges( uni_pos_frags[idx] )
+					if len( uni_pos ) > 1:
+						continue
+					# Remove fragments if there is duplication of residue e.g. 6ap9_B_102,102.
+					if len( set( uni_pos_frags[idx] ) ) != len( uni_pos_frags[idx] ):
 						continue
 
-					mapped_uni_pos = mapping_dict["uni_pos"]
-					mapped_pdb_pos = mapping_dict["pdb_pos"]
-
-					# <=======================================================> #
-					## Remove "nulls"/nan.
-					## Get the mapped Uniprot and PDB fragments.
-					uni_pos_frags, pdb_pos_frags = self.remove_missing_residues( mapped_uni_pos, mapped_pdb_pos )
-
-					# If < self.min_len residues left in the fragment.
-					if len( pdb_pos_frags ) == 0:
-						self.logger[f"#residues<{self.min_len}"].append( f"{pdb}_{asym_id}" )
+					# Remove fragments if Uniprot seq has less residues than in Uniprot mapping.
+					# e.g.: G1SJB4
+					# 		Uniprot residues present in mapping do not exist in seq.
+					# 		Seq length as per Uniprot 317.
+					# 		Uniprot residue positions in mapping = 117-424.
+					# 		PDB (7jqb) residue positions in mapping = 2-314.
+					if uni_pos_frags[idx][-1] > len( self.uniprot_seq[uni_id] ):
+						label = f"{pdb}_{auth_asym_id}_{uni_id}"
+						if label not in logs_dict["aberrant_unIID/mapping"]:
+							logs_dict["aberrant_unIID/mapping"].append( label )
 						continue
-
-					if self.fragment_exceeding_maxlen:
-						# If fragment length > max_len, break it into 2 halves.
-						uni_pos_frags = self.fragment_chain( uni_pos_frags )
-						pdb_pos_frags = self.fragment_chain( pdb_pos_frags )
-
-					# Ignore if the no. of uni fragments does not match no. of pdb fragments.
-					if len( uni_pos_frags ) != len( pdb_pos_frags ):
-						if f"{pdb}_{auth_asym_id}" not in logs_dict["mismatch_in_num_uni/pdb_frags"]:
-							# mismatch_frags.append( pdb )
-							logs_dict["mismatch_in_num_uni/pdb_frags"].append( 
-										f"{pdb}_{auth_asym_id}" 
-										)
-						continue
-
-					# Remove fragments if the length of uniprot and pdb frags do not match.
-					# This may have occured due to problems in mapping e.g. 5nrl, 7jij.
-					uni_pos_frags_, pdb_pos_frags_ = [], []
-					mismatch_found = False
 					
-					for uni_frag, pdb_frag in zip( uni_pos_frags, pdb_pos_frags ):
-						if len( uni_frag ) != len( pdb_frag ):
-							mismatch_found = True
-							continue
-						else:
-							uni_pos_frags_.append( uni_frag )
-							pdb_pos_frags_.append( pdb_frag )
+					total_overlap_residues = 0
+					for overlap in get_overlap( uni_pos_frags[idx], disorder_regions ):
+						total_overlap_residues += len( overlap )
+
+					percent_disorder = total_overlap_residues/len( uni_pos_frags[idx] )
 					
-					if mismatch_found:
-						uni_pos_frags, pdb_pos_frags = uni_pos_frags_, pdb_pos_frags_
-						del uni_pos_frags_
-						del pdb_pos_frags_
-						# mismatch_frag_lengths.append( pdb )
-						logs_dict["mismatch_in_uni/pdb_frag_lengths"].append( 
-										f"{pdb}_{auth_asym_id}"
-										 )
+					if percent_disorder >= self.min_disorder_percent:
+						entry_dict[pdb]["prot1"]["Asym ID"].append( asym_id )
+						entry_dict[pdb]["prot1"]["Auth Asym ID"].append( auth_asym_id )
+						entry_dict[pdb]["prot1"]["Uniprot ID"].append( uni_id )
+						entry_dict[pdb]["prot1"]["Uniprot positions"].append( uni_pos_frags[idx] )
+						entry_dict[pdb]["prot1"]["PDB positions"].append( pdb_pos_frags[idx] )
 
-					# <=======================================================> #
-					## Get all disordered regions from DisProt/IDEAL.					
-					disorder_regions = find_disorder_regions( disprot = self.disprot, 
-																ideal = self.ideal, 
-																mobidb = self.mobidb, 
-																uni_ids = uniprot_ids, 
-																min_len = 1,
-																return_ids = False )
-					
-					# For all the fragments.
-					for idx in range( len( uni_pos_frags ) ):
-						# Overlap mapped_uni_pos with disorder regions on DisProt/IDEAl.
-						# Consider fragments as disordered if atleast min_disorder_percent
-						# 		disordered residues are present.
-						if len( uni_pos_frags[idx] ) > self.max_len:
-							raise Exception( "Fragment exceeds max length..." )
-
-						# Remove fragments if the Uniprot residues are not continous.
-						uni_pos = ranges( uni_pos_frags[idx] )
-						if len( uni_pos ) > 1:
-							continue
-						# Remove fragments if there is duplication of residue e.g. 6ap9_B_102,102.
-						if len( set( uni_pos_frags[idx] ) ) != len( uni_pos_frags[idx] ):
-							continue
-
-						# Remove fragments if Uniprot seq has less residues than in Uniprot mapping.
-						# e.g.: G1SJB4
-						# 		Uniprot residues present in mapping do not exist in seq.
-						# 		Seq length as per Uniprot 317.
-						# 		Uniprot residue positions in mapping = 117-424.
-						# 		PDB (7jqb) residue positions in mapping = 2-314.
-						if uni_pos_frags[idx][-1] > len( self.uniprot_seq[uni_id] ):
-							label = f"{pdb}_{auth_asym_id}_{uni_id}"
-							if label not in logs_dict["aberrant_unIID/mapping"]:
-								logs_dict["aberrant_unIID/mapping"].append( label )
-							continue
-						
-						total_overlap_residues = 0
-						for overlap in get_overlap( uni_pos_frags[idx], disorder_regions ):
-							total_overlap_residues += len( overlap )
-
-						percent_disorder = total_overlap_residues/len( uni_pos_frags[idx] )
-						
-						if percent_disorder >= self.min_disorder_percent:
-							entry_dict[pdb]["prot1"]["Asym ID"].append( asym_id )
-							entry_dict[pdb]["prot1"]["Auth Asym ID"].append( auth_asym_id )
-							entry_dict[pdb]["prot1"]["Uniprot ID"].append( uni_id )
-							entry_dict[pdb]["prot1"]["Uniprot positions"].append( uni_pos_frags[idx] )
-							entry_dict[pdb]["prot1"]["PDB positions"].append( pdb_pos_frags[idx] )
-
-						else:
-							entry_dict[pdb]["prot2"]["Asym ID"].append( asym_id )
-							entry_dict[pdb]["prot2"]["Auth Asym ID"].append( auth_asym_id )
-							entry_dict[pdb]["prot2"]["Uniprot ID"].append( uni_id )
-							entry_dict[pdb]["prot2"]["Uniprot positions"].append( uni_pos_frags[idx] )
-							entry_dict[pdb]["prot2"]["PDB positions"].append( pdb_pos_frags[idx] )
+					else:
+						entry_dict[pdb]["prot2"]["Asym ID"].append( asym_id )
+						entry_dict[pdb]["prot2"]["Auth Asym ID"].append( auth_asym_id )
+						entry_dict[pdb]["prot2"]["Uniprot ID"].append( uni_id )
+						entry_dict[pdb]["prot2"]["Uniprot positions"].append( uni_pos_frags[idx] )
+						entry_dict[pdb]["prot2"]["PDB positions"].append( pdb_pos_frags[idx] )
 
 			processed_entry = {"entry": entry_dict, "logs": logs_dict}
 			with open( f"{self.idr_complexes_dir}{pdb}.json", "w" ) as w:
