@@ -353,7 +353,7 @@ class JudgementDay():
 			if key == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
 				continue
 
-			u1, u2 = key1.split( "--" )
+			u1, u2 = key.split( "--" )
 			u1 = u1.split( ":" )[0]
 			u2, c = u2.split( "_" )
 			u2 = u2.split( ":" )[0]
