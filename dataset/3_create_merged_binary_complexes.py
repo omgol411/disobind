@@ -638,6 +638,7 @@ class Dataset ():
 			
 			else:
 				for idx in range( 1, len( df ) ):
+					# Note: >1 residue overlap must be there.
 					overlap1 = check_for_overlap( 
 									df.loc[idx - 1, "Uniprot positions1"],
 									df.loc[idx, "Uniprot positions1"]
