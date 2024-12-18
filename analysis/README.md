@@ -22,7 +22,7 @@ This script creates a dictionary containing the following outputs for all tasks 
 
 ## AF2/AF3 predictions
 
-Run the following script on the terminal, specify `self.af_model` in the constructor:
+Run the following script on the terminal, specify `self.af_model` and `self.iptm_cutoff` in the constructor:
 ```
 python get_af_prediction.py
 ```
