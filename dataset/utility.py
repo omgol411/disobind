@@ -325,7 +325,8 @@ def ProstT5_embeddings( input_file, output_file ):
 	"""
 
 	print( "Generating ProstT5 embeddings..." )
-	T5_dir = os.path.abspath( "ProstT5/scripts/" ) #"../ProstT5/scripts/"
+	# T5_dir = os.path.abspath( "ProstT5/scripts/" )
+	T5_dir = "../ProstT5/scripts/"
 	main_dir = "../../dataset/"
 	# input_file = f"../../Scripts/{input_file}"
 	# output_file = f"../../Scripts/{output_file}"
@@ -359,8 +360,8 @@ def ProtT5_embeddings( input_file, output_file ):
 	"""
 
 	print( "Generating ProtT5 embeddings..." )
-	T5_dir = os.path.abspath( "ProtTrans/Embedding/" )
-	# T5_dir = "../ProtTrans/Embedding/"
+	# T5_dir = os.path.abspath( "ProtTrans/Embedding/" )
+	T5_dir = "../ProtTrans/Embedding/"
 	main_dir = "../../dataset/"
 	# input_file = f"../../Scripts/{input_file}"
 	# output_file = f"../../Scripts/{output_file}"
