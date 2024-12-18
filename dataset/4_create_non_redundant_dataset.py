@@ -938,9 +938,10 @@ class NonRedundantDataset():
 			prot1, prot2 = {}, {}
 			# w1 = open( f"prot1_{name}_fasta_{version}.fasta", "w" )
 			# w2 = open( f"prot2_{name}_fasta_{version}.fasta", "w" )
-			w = open( f"prot_1-2_{name}_{version}.csv", "w" )
+			w = open( f"prot_1-2_{name}_{self.version}.csv", "w" )
 
-			hf1 = h5py.File( f"Output_bcmap_{name}_{version}.h5", "w" )
+			# hf1 = h5py.File( f"Output_bcmap_{name}_{self.version}.h5", "w" )
+			hf1 = h5py.File( f"Target_bcmap_{name}_{self.version}.h5", "w" )
 
 			# Save the sequence and cmaps.
 			for key in set_.keys():

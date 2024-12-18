@@ -69,7 +69,7 @@ class Embeddings():
 		
 		self.load_cmap = load_cmap
 		if self.load_cmap:
-			self.cmap_path = f"{self.base_path}Output_bcmap_train_v_{self.version}.h5"
+			self.cmap_path = f"{self.base_path}Target_bcmap_train_v_{self.version}.h5"
 			self.cmaps = {}
 
 		# .json file containing all the Uniprot seq.
