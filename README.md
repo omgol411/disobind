@@ -7,7 +7,7 @@
 Disobind is a deep learning method for predicting inter-protein contact maps and interface residues for an IDR and its binding partner from their sequences. 
 
 
-![main_fig](Fig_2.png)
+![main_fig](Fig_S3.png)
 
 
 ## Publication and Data
