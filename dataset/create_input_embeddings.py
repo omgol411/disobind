@@ -60,8 +60,8 @@ class Embeddings():
 
 		if base_path == None:
 			# Absolute path for the Database directory.
-			self.base_path = os.path.abspath( "../database/" )
-			self.dataset_path = f"{self.base_path}{self.embedding_type}/{self.scope}/"
+			self.base_path = os.path.abspath( f"../database/{self.version}" )
+			self.dataset_path = f"{self.base_path}/{self.embedding_type}/{self.scope}/"
 
 		else:
 			self.base_path = base_path
@@ -69,13 +69,13 @@ class Embeddings():
 		
 		self.load_cmap = load_cmap
 		if self.load_cmap:
-			self.cmap_path = f"{self.base_path}Target_bcmap_train_v_{self.version}.h5"
+			self.cmap_path = f"{self.base_path}/Target_bcmap_train_v_{self.version}.h5"
 			self.cmaps = {}
 
 		# .json file containing all the Uniprot seq.
 		if uniprot_seq == None:
 			# self.all_Uniprot_seq_file = "Disobind_Uniprot_seq"
-			self.all_Uniprot_seq_file = f"{self.base_path}Uniprot_seq.json"
+			self.all_Uniprot_seq_file = f"{self.base_path}/Uniprot_seq.json"
 			with open( self.all_Uniprot_seq_file, "r" ) as f:
 				self.all_Uniprot_seq = json.load( f )
 		else:
@@ -85,7 +85,7 @@ class Embeddings():
 		if fasta_file == None:
 			self.fasta_file = f"{self.base_path}/{self.embedding_type}/train_fasta_{self.scope}-{self.flanking_region}_v_{self.version}.fasta"
 
-			self.p1_p2_csv_file = f"{self.base_path}prot_1-2_train_v_{self.version}.csv"
+			self.p1_p2_csv_file = f"{self.base_path}/prot_1-2_train_v_{self.version}.csv"
 		
 		else:
 			self.fasta_file = fasta_file
@@ -138,7 +138,7 @@ class Embeddings():
 		"""
 		self.tic = time.time()
 
-		dir_path = f"{self.base_path}{self.embedding_type}/"
+		dir_path = f"{self.base_path}/{self.embedding_type}/"
 		if not os.path.exists( dir_path ):
 			os.makedirs( dir_path )
 
