@@ -55,7 +55,7 @@ class AF2MPredictions():
 			self.af_test_pred_dir = "AF3_preds"
 
 		# OOD set target contact maps.
-		self.cmap = h5py.File( f"{self.base_path}Output_bcmap_test_v_{self.version}.h5", "r" )		
+		self.cmap = h5py.File( f"{self.base_path}Target_bcmap_test_v_{self.version}.h5", "r" )		
 		# File to store AF2/3 derived contact maps for OOD set.
 		self.af_pred_dir = f"./AF_preds_v{self.version}/"
 		# Dict to store prediction results.

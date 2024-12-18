@@ -40,7 +40,7 @@ class JudgementDay():
 		self.disobind_preds = f"./Predictions_ood_v{self.version}/Disobind_Predictions.npy"
 
 		# OOD set target contact maps file.
-		self.target_cmap = f"{self.base_path}v_{self.version}/Output_bcmap_test_v_{self.version}.h5"
+		self.target_cmap = f"{self.base_path}v_{self.version}/Target_bcmap_test_v_{self.version}.h5"
 		# Fraction of positives in the dataset for all tasks.
 		self.fraction_positives = f"{self.base_path}v_{self.version}/T5/global-None/fraction_positives.json"
 		# File containing info about the merged binary complexes in the dataset.
