@@ -60,8 +60,8 @@ class Embeddings():
 
 		if base_path == None:
 			# Absolute path for the Database directory.
-			self.base_path = os.path.abspath( f"../database/{self.version}" )
-			self.dataset_path = f"{self.base_path}/{self.embedding_type}/{self.scope}/"
+			self.base_path = os.path.abspath( f"../database/v_{self.version}" )
+			self.dataset_path = f"{self.base_path}/{self.embedding_type}/{self.scope}-None/"
 
 		else:
 			self.base_path = base_path
@@ -83,7 +83,7 @@ class Embeddings():
 
 		# Fasta files.
 		if fasta_file == None:
-			self.fasta_file = f"{self.base_path}/{self.embedding_type}/train_fasta_{self.scope}-{self.flanking_region}_v_{self.version}.fasta"
+			self.fasta_file = f"{self.base_path}/{self.embedding_type}/train_fasta_{self.scope}-None_v_{self.version}.fasta"
 
 			self.p1_p2_csv_file = f"{self.base_path}/prot_1-2_train_v_{self.version}.csv"
 		
@@ -92,7 +92,7 @@ class Embeddings():
 				
 		# File name for the generated embeddings.
 		if emb_file == None:
-			self.emb_file = f"{self.base_path}/{self.embedding_type}/train_emb_{self.scope}-{self.flanking_region}_v_{self.version}.h5"
+			self.emb_file = f"{self.base_path}/{self.embedding_type}/train_emb_{self.scope}-None_v_{self.version}.h5"
 		else:
 			self.emb_file = emb_file
 		
