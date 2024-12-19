@@ -1,8 +1,4 @@
 
-[![PubMed](https://salilab.org/imp-systems/static/images/pubmed.png)]()
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14504763.svg)](10.5281/zenodo.14504763)
-
 # Disobind
 Disobind is a deep learning method for predicting inter-protein contact maps and interface residues for an IDR and its binding partner from their sequences. 
 
