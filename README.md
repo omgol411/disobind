@@ -1,7 +1,7 @@
 
 [![PubMed](https://salilab.org/imp-systems/static/images/pubmed.png)]()
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10360718.svg)]()
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10360718.svg)](10.5281/zenodo.14504763)
 
 # Disobind
 Disobind is a deep learning method for predicting inter-protein contact maps and interface residues for an IDR and its binding partner from their sequences. 
@@ -12,7 +12,7 @@ Disobind is a deep learning method for predicting inter-protein contact maps and
 
 ## Publication and Data
 * Kartik Majila, Varun Ullanat, Shruthi Viswanath. **A deep learning method for predicting interactions for intrinsically disordered regions of proteins.** bioRxiv, [DOI]().
-* Data is deposited in [Zenodo]()
+* Data is deposited in [Zenodo](10.5281/zenodo.14504763)
 
 
 ## Dependencies:
