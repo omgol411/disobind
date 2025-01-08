@@ -835,9 +835,8 @@ class NonRedundantDataset():
 				end = len( test_entry_ids )
 			else:
 				end = start + 20
-
+			af3_batch = []
 			for entry_id in test_entry_ids[start:end]:
-				af3_batch = []
 				af3_entry = {}
 				af3_entry["name"] = entry_id
 				af3_entry["modelSeeds"] = []
