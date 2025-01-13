@@ -115,7 +115,6 @@ class Disobind():
 			For predict mode,
 				Download the sequences.
 		"""
-		# base_path = f"/data2/kartik/Disorder_Proteins/Archive/Database_17Apr24/v_{self.version}/"
 		headers, af_paths = self.read_csv_input()
 
 		prot_pairs = self.process_input_pairs( headers )
