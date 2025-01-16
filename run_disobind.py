@@ -849,10 +849,18 @@ class Disobind():
 			output = output[:len_p1, :len_p2]
 			idx = np.where( output >= self.threshold )
 			df = pd.DataFrame()
-			df["Protein1"] = prot1
-			df["Residue1"] = beads1[idx[0]] if len( idx[0] ) != 0 else []
-			df["Protein2"] = prot2
-			df["Residue2"] = beads2[idx[1]] if len( idx[1] ) != 0 else []
+			if len( idx[0] ) != 0:
+				df["Protein1"] = [prot1]*len( idx[0] )
+				df["Residue1"] = beads1[idx[0]]
+			else:
+				df["Protein1"] = []
+				df["Residue1"] = []
+			if len( idx[1] ) != 0:
+				df["Protein2"] = [prot2]*len( idx[1] )
+				df["Residue2"] = beads2[idx[1]]
+			else:
+				df["Protein2"] = []
+				df["Residue2"] = []
 
 		elif "interface" in  obj:
 			# output = output.reshape( ( 2*eff_len[0], 1 ) )
