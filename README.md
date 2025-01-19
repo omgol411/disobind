@@ -47,7 +47,9 @@ To run a Disobind prediction only, provide the input as:
 `UniProt_ID1,start1,end1,UniProt_ID2,start2,end2`.
 
 To run a Disobind+AF2 prediction, provide the input as:  
-`UniProt_ID1,start1,end1,UniProt_ID2,start2,end2,AF2_struct_file_path,AF2_pkl_file_path`.
+`UniProt_ID1,start1,end1,UniProt_ID2,start2,end2,AF2_struct_file_path,AF2_pae_file_path`.
+
+AF2 structure for the complete UniProt sequences of protein1 and protein2 must be provided.
 
 As an example see `example/test.csv`.  
 
