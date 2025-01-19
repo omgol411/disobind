@@ -17,10 +17,14 @@ import joblib
 import tqdm
 from multiprocessing import Pool
 import pickle as pkl
+import Bio
 from Bio.PDB import PDBParser, MMCIFParser
+
 
 import torch
 from torch import nn
+
+from typing import List, Dict
 
 import dataset
 from dataset.from_APIs_with_love import get_uniprot_seq
@@ -30,11 +34,12 @@ from src.models.get_model import get_model
 from src.utils import prepare_input
 from analysis.params import parameter_files
 
+
 """
 Script to obtain Disobind predictions for a user.
 Inputs:
 	Disobind needs the UniProt IDs for both the proteins and the protein 1 (1st in the pair) must be an IDR.
-	The input must be provided in a csv file formatas shown beloq:
+	The input must be provided in a csv file formatas shown below:
 	Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2,end_res2
 
 Outputs:
@@ -242,149 +247,153 @@ class Disobind():
 		return headers, af_paths
 
 
-	def get_af_pred( self, model_file, pae_file ):
-		"""
-		Parse the AF2 predicted structure if provided.
-		Obtain contact map, binary pLDDT and PAE matrices.
-		Get contact map with only high confidence contacts:
-			pLDDT >= 70
-			PAE <= 5
-		Pad the contact map up to max_len.
+	# def get_af_pred( self, model_file, pae_file ):
+	# 	"""
+	# 	Parse the AF2 predicted structure if provided.
+	# 	Obtain contact map, binary pLDDT and PAE matrices.
+	# 	Get contact map with only high confidence contacts:
+	# 		pLDDT >= 70
+	# 		PAE <= 5
+	# 	Pad the contact map up to max_len.
 
-		Input:
-		----------
-		model_file --> PDB file for AF2 predicted structure.
-		pae_file --> pkl file containing the PAE matrix for the AF2 prediction.
+	# 	Input:
+	# 	----------
+	# 	model_file --> PDB file for AF2 predicted structure.
+	# 	pae_file --> pkl file containing the PAE matrix for the AF2 prediction.
 
-		Returns:
-		----------
-		af2_pred --> (np.array) AF2 predicted contact map.
-		"""
-		with open( pae_file, "rb" ) as f:
-			data = pkl.load( f )
-		pae = data["predicted_aligned_error"]
+	# 	Returns:
+	# 	----------
+	# 	af2_pred --> (np.array) AF2 predicted contact map.
+	# 	"""
+	# 	with open( pae_file, "rb" ) as f:
+	# 		data = pkl.load( f )
+	# 	pae = data["predicted_aligned_error"]
 
-		coords_dict = {}
-		plddt_dict = {}
-		if ".pdb" in model_file:
-			models = PDBParser().get_structure( "pdb", model_file )
-		elif ".cif" in model_file:
-			models = MMCIFParser().get_structure( "cif", model_file )
-		else:
-			raise Exception( "Incorrect file format for the AF2 prediction..." )
+	# 	coords_dict = {}
+	# 	plddt_dict = {}
+	# 	if ".pdb" in model_file:
+	# 		models = PDBParser().get_structure( "pdb", model_file )
+	# 	elif ".cif" in model_file:
+	# 		models = MMCIFParser().get_structure( "cif", model_file )
+	# 	else:
+	# 		raise Exception( "Incorrect file format for the AF2 prediction..." )
 
-		for model in models:
-			for chain in model:
-				coords_dict[chain.id[0]] = []
-				plddt_dict[chain.id[0]] = []
-				for residue in chain:
-					# Take only the ATOM entries and ignore the 
-					# 		HETATM entries (which contain "w" instead of " ").
-					if residue.id[0] == " ":
-						coords_dict[chain.id[0]].append( residue['CA'].coord )
-						plddt_dict[chain.id[0]].append( residue["CA"].get_bfactor() )
-				coords_dict[chain.id[0]] = np.array( coords_dict[chain.id[0]] )
+	# 	for model in models:
+	# 		for chain in model:
+	# 			coords_dict[chain.id[0]] = []
+	# 			plddt_dict[chain.id[0]] = []
+	# 			for residue in chain:
+	# 				# Take only the ATOM entries and ignore the 
+	# 				# 		HETATM entries (which contain "w" instead of " ").
+	# 				if residue.id[0] == " ":
+	# 					coords_dict[chain.id[0]].append( residue['CA'].coord )
+	# 					plddt_dict[chain.id[0]].append( residue["CA"].get_bfactor() )
+	# 			coords_dict[chain.id[0]] = np.array( coords_dict[chain.id[0]] )
 
-		plddt_mat, pae_mat = self.get_plddt_pae_mat( plddt_dict, pae )
-		pae_mat = np.where( pae_mat <= self.pae_threshold, 1, 0 )
+	# 	plddt_mat, pae_mat = self.get_plddt_pae_mat( plddt_dict, pae )
+	# 	pae_mat = np.where( pae_mat <= self.pae_threshold, 1, 0 )
 
-		chainA, chainB = coords_dict.keys()
-		contact_map = get_contact_map( coords_dict[chainA], coords_dict[chainB], self.dist_threshold )
+	# 	chainA, chainB = coords_dict.keys()
+	# 	contact_map = get_contact_map( coords_dict[chainA], coords_dict[chainB], self.dist_threshold )
 
-		m, n = contact_map.shape
-		pad = np.zeros( ( self.max_len, self.max_len ) )
-		pad[:m, :n] = contact_map
-		contact_map = pad
+	# 	m, n = contact_map.shape
+	# 	pad = np.zeros( ( self.max_len, self.max_len ) )
+	# 	pad[:m, :n] = contact_map
+	# 	contact_map = pad
 
-		af2_pred = contact_map*plddt_mat*pae_mat
+	# 	af2_pred = contact_map*plddt_mat*pae_mat
 
-		return af2_pred
+	# 	return af2_pred
 
 
 
-	def get_plddt_pae_mat( self, plddt_dict, pae ):
-		"""
-		Create a binary matrix based on:
-			plDDT values of prot1/2 for AF2 structures.
-				plDDT >= 70 --> 1 else 0
-			PAE matrix
-				plDDT <= 5 --> 1 else 0
+	# def get_plddt_pae_mat( self, plddt_dict, pae ):
+	# 	"""
+	# 	Create a binary matrix based on:
+	# 		plDDT values of prot1/2 for AF2 structures.
+	# 			plDDT >= 70 --> 1 else 0
+	# 		PAE matrix
+	# 			plDDT <= 5 --> 1 else 0
 
-		Input:
-		----------
-		plddt_dict --> dict containing Ca-plddt for all residues in all chains.
-		pae --> AF2/3 predicted PAE matrix.
+	# 	Input:
+	# 	----------
+	# 	plddt_dict --> dict containing Ca-plddt for all residues in all chains.
+	# 	pae --> AF2/3 predicted PAE matrix.
 
-		Returns:
-		----------
-		plddt_mat --> binary mask indicating residues with high pLDDT.
-		pae_mat --> binary mask indicating residues with high PAE.
-		"""
-		chain1, chain2 = list( plddt_dict.keys() )
-		plddt1 = np.array( plddt_dict[chain1] ).reshape( -1, 1 )
-		plddt2 = np.array( plddt_dict[chain2] ).reshape( 1, -1 )
-		plddt1 = np.where( plddt1 >= self.plddt_threshold, 1, 0 )
-		plddt2 = np.where( plddt2 >= self.plddt_threshold, 1, 0 )
-		plddt_mat = plddt1*plddt2
+	# 	Returns:
+	# 	----------
+	# 	plddt_mat --> binary mask indicating residues with high pLDDT.
+	# 	pae_mat --> binary mask indicating residues with high PAE.
+	# 	"""
+	# 	chain1, chain2 = list( plddt_dict.keys() )
+	# 	plddt1 = np.array( plddt_dict[chain1] ).reshape( -1, 1 )
+	# 	plddt2 = np.array( plddt_dict[chain2] ).reshape( 1, -1 )
+	# 	plddt1 = np.where( plddt1 >= self.plddt_threshold, 1, 0 )
+	# 	plddt2 = np.where( plddt2 >= self.plddt_threshold, 1, 0 )
+	# 	plddt_mat = plddt1*plddt2
 
-		m, n = plddt_mat.shape
-		padded_mat = np.zeros( ( self.max_len, self.max_len ) )
+	# 	m, n = plddt_mat.shape
+	# 	padded_mat = np.zeros( ( self.max_len, self.max_len ) )
 
-		padded_mat[:m, :n] = plddt_mat
-		plddt_mat = padded_mat
+	# 	padded_mat[:m, :n] = plddt_mat
+	# 	plddt_mat = padded_mat
 
-		# Taking the upper-right and lower-left quadrants.
-		pae_ur = pae[:m, m:]
-		pae_ll = pae[m:, :m]
-		pae = ( pae_ur + pae_ll.T )/2
+	# 	# Taking the upper-right and lower-left quadrants.
+	# 	pae_ur = pae[:m, m:]
+	# 	pae_ll = pae[m:, :m]
+	# 	pae = ( pae_ur + pae_ll.T )/2
 
-		if m != pae.shape[0] or n != pae.shape[1]:
-			raise Exception( "Incorrect PAE matrix dimensions..." )
+	# 	if m != pae.shape[0] or n != pae.shape[1]:
+	# 		raise Exception( "Incorrect PAE matrix dimensions..." )
 
-		m, n = pae.shape
-		pae_mat = np.zeros( ( self.max_len, self.max_len ) )
-		pae_mat[:m, :n] = pae
+	# 	m, n = pae.shape
+	# 	pae_mat = np.zeros( ( self.max_len, self.max_len ) )
+	# 	pae_mat[:m, :n] = pae
 
-		# Create a binary PAE matrix to highlight confident predictions.
-		pae_mat = np.where( pae_mat <= self.pae_threshold, 1, 0 )
+	# 	# Create a binary PAE matrix to highlight confident predictions.
+	# 	pae_mat = np.where( pae_mat <= self.pae_threshold, 1, 0 )
 
-		return plddt_mat, pae_mat
+	# 	return plddt_mat, pae_mat
 
 
 ###################################################################################
 ##-------------------------------------------------------------------------------##
 ###################################################################################
-	def parallelize_uni_seq_download( self, head ):
+	def parallelize_uni_seq_download( self, uni_id ):
 		"""
 		Obtain all unique UniProt IDs in the provided input.
 		Download all unique UniProt sequences.
 
 		Input:
 		----------
-		head --> identifier for a binary complexes.
+		uni_id --> (str) UniProt ID protein.
 
 		Returns:
 		----------
-		uni_id1 --> (str) UniProt ID protein 1.
-		seq1 --> (str) UniProt seq for protein 1.
-		uni_id2 --> (str) UniProt ID protein 2.
-		seq2 --> (str) UniProt seq for protein 2.
+		uni_id --> (str) UniProt ID protein.
+		seq --> (str) UniProt seq for protein.
 		"""
-		head1, head2 = head.split( "--" )
-		uni_id1, _, _ = head1.split( ":" )
-		uni_id2, _, _ = head2.split( ":" )
+		seq = get_uniprot_seq( uni_id, max_trials = 10, wait_time = 20, return_id = False )
 
-		if uni_id1 not in self.uniprot_seq.keys():
-			seq1 = get_uniprot_seq( uni_id1, max_trials = 10, wait_time = 20, return_id = False )
-		else:
-			seq1 = self.uniprot_seq[uni_id1]
+		return uni_id, seq
 
-		if uni_id2 not in self.uniprot_seq.keys() or uni_id1 != uni_id2:
-			seq2 = get_uniprot_seq( uni_id2, max_trials = 10, wait_time = 20, return_id = False )
-		else:
-			seq2 = self.uniprot_seq[uni_id2]
 
-		return uni_id1, seq1, uni_id2, seq2
+	def get_unique_uni_ids( self, headers ):
+		"""
+		Given a list of all protein pairs, get all the unique Uniprot IDs.
+		"""
+		unique_uni_ids = []
+		for head in headers:
+			head1, head2 = head.split( "--" )
+			uni_id1 = head1.split( ":" )[0]
+			uni_id2 = head2.split( ":" )[0]
+
+			if uni_id1 not in unique_uni_ids:
+				unique_uni_ids.append( uni_id1 )
+			if uni_id2 not in unique_uni_ids:
+				unique_uni_ids.append( uni_id2 )
+
+		return unique_uni_ids
 
 
 
@@ -401,23 +410,22 @@ class Disobind():
 		----------
 		None
 		"""
-		all_unique_uni_ids = []
+		unique_uni_ids = self.get_unique_uni_ids( headers )
+
 		with Pool( self.cores ) as p:
-			for result in tqdm.tqdm( p.imap_unordered( self.parallelize_uni_seq_download, headers ), total = len( headers ) ):
-				uni_id1, seq1, uni_id2, seq2 = result
+			for result in tqdm.tqdm( p.imap_unordered( 
+													self.parallelize_uni_seq_download, 
+													unique_uni_ids ), 
+										total = len( unique_uni_ids ) ):
+				uni_id, seq = result
 
-				if uni_id1 not in all_unique_uni_ids:
-					all_unique_uni_ids.append( uni_id1 )
-				if uni_id2 not in all_unique_uni_ids:
-					all_unique_uni_ids.append( uni_id2 )
+				if len( seq ) != 0:
+					self.uniprot_seq[uni_id] = seq
+				else:
+					raise Exception( f"Unable o download seq for Uniprot ID: {uni_id}. Please retry..." )
 
-				if len( seq1 ) != 0:
-					self.uniprot_seq[uni_id1] = seq1
-				if len( seq2 ) != 0:
-					self.uniprot_seq[uni_id2] = seq2
-		print( "Unique Uniprot IDs = ", len( all_unique_uni_ids ) )
+		print( "Unique Uniprot IDs = ", len( unique_uni_ids ) )
 		print( "Total Uniprot sequences obtained = ", len( self.uniprot_seq ) )
-
 
 
 ###################################################################################
@@ -662,8 +670,8 @@ class Disobind():
 		for idx, entry_id in enumerate( self.prot1_emb.keys() ):
 			head1, head2 = entry_id.split( "--" )
 			head2, num = head2.split( "_" )
-			uni_id1, _, _ = head1.split( ":" )
-			uni_id2, _, _ = head2.split( ":" )
+			uni_id1, start1, end1 = head1.split( ":" )
+			uni_id2, start2, end2 = head2.split( ":" )
 			# header = f"{uni_id1}--{uni_id2}_{num}"
 
 			# Pair does not have the _0 at the end.
@@ -710,7 +718,11 @@ class Disobind():
 					model_file, pae_file = af_paths[entry_id]
 					# If AF2 input is not provided.
 					if model_file != None:
-						af2_pred = self.get_af_pred( model_file = model_file, pae_file = pae_file )
+						af_obj = AfPrediction( struct_file_path = model_file, data_file_path = pae_file )
+						af2_pred = af_obj.get_confident_interactions( [int( start1 ), int( end1 )],
+																	[int( start2 ), int( end2 )] )
+
+						# af2_pred = self.get_af_pred( model_file = model_file, pae_file = pae_file )
 						af2_pred = self.process_af2_pred( af2_pred )
 
 						# Get Disobind+AF2 output.
@@ -886,6 +898,350 @@ class Disobind():
 		df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg{cg}.csv" )
 
 		return output, df
+
+
+
+###################################################################################
+##-------------------------------------------------------------------------------##
+###################################################################################
+class AfPrediction():
+	def __init__( self, struct_file_path: str, data_file_path: str ):
+		# AF2/3 structure file path.
+		self.struct_file_path = struct_file_path
+		# AF2/3 structure data file path.
+		self.data_file_path = data_file_path
+
+		# Max length for pad.
+		self.max_len = 100
+		# Distance threshold in (Angstorm) to define a contact between residue pairs.
+		self.dist_threshold = 8
+		# pLDDt cutoff to consider a confident prediction.
+		self.plddt_cutoff = 70
+		# PAE cutoff to consider a confident prediction.
+		self.pae_cutoff = 5
+
+		# Biopython Structure object.
+		self.structure = self.get_structure( 
+									self.get_parser()
+									 )
+		# Get chains and sanity check for binary complex.
+		self.get_chains()
+		# Residue positions of all residues for each chain.
+		self.get_residue_positions()
+		self.get_chain_lengths( self.res_dict )
+		# Ca-coords of all residues for each chain.
+		self.get_ca_coordinates()
+		# Ca-plddt of all residues for each chain.
+		self.get_ca_plddt()
+		# Average PAE matrix.
+		self.get_pae()
+
+
+
+	def get_parser( self ):
+		"""
+		Get the required parser (PDB/CIF) for the input file.
+		"""
+		ext = os.path.splitext( self.struct_file_path )[1]
+
+		if "pdb" in ext:
+			parser = PDBParser()
+		elif "cif" in ext:
+			parser = MMCIFParser()
+		else:
+			raise Exception( "Incorrect file format.. Suported .pdb/.cif only." )
+
+		return parser
+
+
+	def get_chains( self ):
+		"""
+		Get the total no. of chains in the prediction.
+		Only binary complexes are allowed.
+		"""
+		self.chain_ids = [chain.id for model in self.structure for chain in model]
+
+		if len( self.chain_ids ) > 2:
+			raise Exception( "Too many chains. Does support non-binary complexes..." )
+
+
+	def get_structure( self, parser: Bio.PDB.PDBParser ):
+		"""
+		Return the Biopython Structure object for the input file.
+		"""
+		basename = os.path.basename( self.struct_file_path )
+		structure = parser.get_structure( basename, self.struct_file_path )
+
+		return structure
+
+
+	def get_residues( self ):
+		"""
+		Get all residues in the structure.
+		"""
+		coords = []
+		for model in self.structure:
+			for chain in model:
+				chain_id = chain.id[0]
+				for residue in chain:
+					yield residue, chain_id
+
+
+	def extract_perresidue_quantity( self, residue, quantity: str ): 
+		"""
+		Given the Biopython residue object, return the specified quantity:
+			1. residue position
+			2. Ca-coordinate
+			3. Ca-pLDDT
+		"""
+		# Use Ca-atom for all other amino acids.
+		rep_atom = "CA"
+
+		if quantity == "res_pos":
+			return residue.id[1]
+
+		elif quantity == "coords":
+			coords = residue[rep_atom].coord
+			return coords
+		
+		elif quantity == "plddt":
+			plddt = residue[rep_atom].bfactor
+			return plddt
+		
+		else:
+			raise Exception( f"Specified quantity: {quantity} does not exist..." )
+
+
+	def get_residue_positions( self ):
+		"""
+		Get the residue positions for all residues.
+		"""
+		res_dict = {}
+		for residue, chain_id in self.get_residues():
+			res_id = self.extract_perresidue_quantity( residue, "res_pos" )
+			if chain_id not in res_dict.keys():
+				res_dict[chain_id] = np.array( res_id )
+			else:
+				res_dict[chain_id] = np.append( res_dict[chain_id], res_id )
+
+		self.res_dict = {k: v.reshape( -1, 1 ) for k, v in res_dict.items()}
+
+
+
+	def get_chain_lengths( self, res_dict: Dict ):
+		"""
+		Create a dict containing the length of all chains in the system 
+			and the total length of the system.
+		"""
+		lengths_dict = {}
+		lengths_dict["total"] = 0
+		for chain in res_dict:
+			chain_length = len( res_dict[chain] )
+			lengths_dict[chain] = chain_length
+			lengths_dict["total"] += chain_length
+
+		self.lengths_dict = lengths_dict
+
+
+	def get_ca_coordinates( self ):
+		"""
+		Get the coordinates for all Ca atoms of all residues.
+		"""
+		coords_dict = {}
+		for residue, chain_id in self.get_residues():
+			coords = self.extract_perresidue_quantity( residue, "coords" )
+			if chain_id not in coords_dict.keys():
+				coords_dict[chain_id] = np.array( coords )
+			else:
+				coords_dict[chain_id] = np.append( coords_dict[chain_id], coords )
+
+		self.coords_dict = {k: v.reshape( -1, 3 ) for k, v in coords_dict.items()}
+
+
+
+	def get_ca_plddt( self ):
+		"""
+		Get the pLDDT score for all Ca atoms of all residues.
+		"""
+		plddt_dict = {}
+		for residue, chain_id in self.get_residues():
+			plddt = self.extract_perresidue_quantity( residue, "plddt" )
+			if chain_id not in plddt_dict.keys():
+				plddt_dict[chain_id] = np.array( [plddt] )
+			else:
+				plddt_dict[chain_id] = np.append( plddt_dict[chain_id], plddt )
+
+		self.plddt_dict = {k: v.reshape( -1, 1 ) for k, v in plddt_dict.items()}
+
+
+
+	def get_data_dict( self ):
+		"""
+		Parse the AF2/3 data file.
+			AF2 data file is saved as a .pkl file 
+				whereas for AF3 it's stored as .json.
+		"""
+		ext = os.path.splitext( self.data_file_path )[1]
+
+		if "json" in ext:
+			with open( self.data_file_path, "rb" ) as f:
+				data = json.load( f )
+		else:
+			raise Exception( "Incorrect file format.. Suported .json only." )
+
+		return data[0]
+
+
+
+	def get_pae( self ):
+		"""
+		Return the PAE matrix from the data dict.
+			AF2/3 PAE matrix is asymmetric.
+			Hence, we consider the average PAE: ( PAE + PAE.T )/2.
+		"""
+		data = self.get_data_dict()
+		# For AF2.
+		if "predicted_aligned_error" in data.keys():
+			pae = np.array( data["predicted_aligned_error"] )
+		else:
+			raise Exception( "PAE matrix not found..." )
+
+		self.pae = ( pae + pae.T )/2
+
+
+
+	def get_chains_n_indices( self, interacting_region: Dict ):
+		"""
+		Obtain the chain IDs and residues indices 
+			for the required interacting region.
+		residue_index = residue_position - 1
+		"""
+		chain1, chain2 = interacting_region.keys()
+		mol1_res1, mol1_res2 = interacting_region[chain1]
+		mol1_res1 -= 1
+		mol2_res1, mol2_res2 = interacting_region[chain2]
+		mol2_res1 -= 1
+
+		return [chain1, chain2], [mol1_res1, mol1_res2], [mol2_res1, mol2_res2]
+
+
+
+	def get_required_coords( self, chains: List, mol1_res: List, mol2_res: List ):
+		"""
+		Get the coordinates for the interacting region 
+			for which confident interactions are required.
+		"""
+		chain1, chain2 = chains
+		start1, end1 = mol1_res
+		start2, end2 = mol2_res
+		coords1 = self.coords_dict[chain1][start1:end1,:]
+		coords2 = self.coords_dict[chain2][start2:end2,:]
+
+		return coords1, coords2
+
+
+
+	def get_required_plddt( self, chains: List, mol1_res: List, mol2_res: List ):
+		"""
+		Get the plddt for the interacting region 
+			for which confident interactions are required.
+		"""
+		chain1, chain2 = chains
+		start1, end1 = mol1_res
+		start2, end2 = mol2_res
+		plddt1 = self.plddt_dict[chain1][start1:end1]
+		plddt2 = self.plddt_dict[chain2][start2:end2]
+
+		return plddt1, plddt2
+
+
+
+	def get_required_pae( self, chains: List, mol1_res: List, mol2_res: List ):
+		"""
+		Get the PAE matrix for the interacting region.
+			For this we need the cumulative residue index 
+				uptil the required residue position.
+		"""
+		chain1, chain2 = chains
+		start1, end1 = mol1_res
+		start2, end2 = mol2_res
+
+		# Count total residues till start1 and start2.
+		cum_start1, cum_start2 = 0, 0
+		for chain in self.res_dict:
+			if chain == chain1:
+				cum_start1 += start1
+				break
+			else:
+				cum_start1 += len( self.res_dict[chain] )
+
+		for chain in self.res_dict:
+			if chain == chain2:
+				cum_start2 += start2
+				break
+			else:
+				cum_start2 += len( self.res_dict[chain] )
+
+		cum_end1 = cum_start1 + ( end1 - start1 )
+		cum_end2 = cum_start2 + ( end2 - start2 )
+
+		pae = self.pae[cum_start1:cum_end1, cum_start2:cum_end2]
+
+		return pae
+
+
+	def get_interaction_data( self, interacting_region ):
+		"""
+		Get the interaction amp, pLDDT, and PAE for the interacting region.
+		"""
+		chains, mol1_res, mol2_res = self.get_chains_n_indices( interacting_region )
+
+		coords1, coords2 = self.get_required_coords( chains, mol1_res, mol2_res )
+
+		# Create a contact map or distance map as specified.
+		contact_map = get_contact_map( coords1, coords2, self.dist_threshold )
+		# interaction_map = get_interaction_map( coords1, coords2, 
+		# 										self.contact_threshold )
+
+		plddt1, plddt2 = self.get_required_plddt( chains, mol1_res, mol2_res )
+		pae = self.get_required_pae( chains, mol1_res, mol2_res )
+
+		return contact_map, plddt1, plddt2, pae
+
+
+	def apply_confidence_cutoffs( self, plddt1, plddt2, pae ):
+		"""
+		mask low-confidence interactions.
+		"""
+		plddt1 = np.where( plddt1 >= self.plddt_cutoff, 1, 0 )
+		plddt2 = np.where( plddt2 >= self.plddt_cutoff, 1, 0 )
+		plddt_matrix = plddt1 * plddt2.T
+
+		pae = np.where( pae <= self.pae_cutoff, 1, 0 )
+
+		return plddt_matrix, pae
+
+
+	def get_confident_interactions( self, prot1_res, prot2_res ):
+		"""
+		For the specified regions in the predicted structure, 
+			obtain all confident interacting residue pairs.
+		Assuming that chain 1 and 2 will correspond to protein 1 and 2 respectively.
+		"""
+		chain1, chain2 = self.chain_ids
+		interacting_region = {}
+		interacting_region[chain1] = prot1_res
+		interacting_region[chain2] = prot2_res
+		contact_map, plddt1, plddt2, pae = self.get_interaction_data( interacting_region )
+		plddt_matrix, pae = self.apply_confidence_cutoffs( plddt1, plddt2, pae )
+		confident_interactions = contact_map * plddt_matrix * pae
+
+		m, n = confident_interactions.shape
+		pad = np.zeros( ( self.max_len, self.max_len ) )
+		pad[:m, :n] = confident_interactions
+		confident_interactions = pad
+
+		return confident_interactions
 
 
 #################################################################
