@@ -633,15 +633,29 @@ class Disobind():
 						# Get Disobind+AF2 output.
 						m, n = uncal_output.shape
 						af2_diso = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
-						output = np.max( af2_diso, axis = 1 ).reshape( m, n )
-					else:
-						output = uncal_output
+						af2_diso = np.max( af2_diso, axis = 1 ).reshape( m, n )
 
-					output, df = self.extract_model_output( entry_id, output, eff_len )
-					
+						# print( np.count_nonzero( af2_pred ) )
+						# exit()
+
+						af2_pred, df_af2 = self.extract_model_output( entry_id, af2_pred, eff_len, "af2" )
+						af2_diso, df_af2_diso = self.extract_model_output( entry_id, af2_diso, eff_len, "af2_diso" )
+
+					else:
+						af2_diso = np.array( [] )
+						af2_pred = np.array( [] )
+						df_af2 = pd.DataFrame( {} )
+						df_af2_diso = pd.DataFrame( {} )
+
+					uncal_output, df_diso = self.extract_model_output( entry_id, uncal_output, eff_len, "diso" )
+
 					predictions[pair_id][entry_id][f"{obj}_{cg}"] = {
-																	"Raw_Preds": np.float32( output ),
-																	"Final_preds": df
+																	"Disobind": np.float32( uncal_output ),
+																	"AF2": np.float32( af2_pred ),
+																	"AF2+Diso": np.float32( af2_diso ),
+																	"Final_diso_preds": df_diso,
+																	"Final_af2_preds": df_af2,
+																	"Final_af2_diso_preds": df_af2_diso
 																		}
 					print( f"{idx} ------------------------------------------------------------\n" )
 		return predictions
@@ -736,7 +750,7 @@ class Disobind():
 
 
 
-	def extract_model_output( self, entry_id, output, eff_len ):
+	def extract_model_output( self, entry_id: str, output: np.array, eff_len: List, name: str ):
 		"""
 		Reshape the model output and target into the required shape 
 			i.e. [L1, L2] for interaction.
@@ -748,6 +762,7 @@ class Disobind():
 		output --> (np.array) model predictions.
 		target --> (np.array) target cmap.
 		eff_len -->  list containing effective lengths for prot1/2.
+		name --> identifier for Disobind/AF2/AF2-Disobind output.
 
 		Returns:
 		----------
@@ -800,7 +815,7 @@ class Disobind():
 			df["Protein1"] = interface1_beads
 			df["Protein2"] = interface2_beads
 			output = np.concatenate( ( interface1, interface2 ), axis = 0 )
-		df.to_csv( f"{self.abs_path}/{self.output_dir}/{entry_id}_{obj}_cg{cg}.csv" )
+		df.to_csv( f"{self.abs_path}/{self.output_dir}/{name}_{entry_id}_{obj}_cg{cg}.csv" )
 
 		return output, df
 
@@ -1002,11 +1017,9 @@ class AfPrediction():
 		# For all chains.
 		for chain in self.get_chains():
 			chain_id = chain.id
-			print( chain_id )
 			
 			for residue in self.get_residues( chain_id ):
 				res_id = self.extract_perresidue_quantity( residue, "res_pos" )
-				print( res_id, "  ", total_length )
 				
 				# For both the protein fragments.
 				for i, prot_res in enumerate( [prot1_res, prot2_res] ):
@@ -1022,7 +1035,6 @@ class AfPrediction():
 								start_idx = total_length
 								# End index is the start index plus the fragment length.
 								end_idx = start_idx + frag_len
-								print( prot_res, " -- ", start_idx, "  ", end_idx, "  ", total_length )
 								frag_index_dict[key] = [start_idx, end_idx]
 								break
 				total_length += 1
@@ -1072,14 +1084,10 @@ class AfPrediction():
 				uptil the required residue position.
 		"""
 		frag_index_dict = self.get_indices_for_pae( prot1_res, prot2_res )
-		print( frag_index_dict )
 		start1_idx, end1_idx = frag_index_dict["prot1"]
 		start2_idx, end2_idx = frag_index_dict["prot2"]
 
 		required_pae = self.pae[start1_idx:end1_idx, start2_idx:end2_idx]
-		print( required_pae )
-		print( required_pae.shape )
-		exit()
 
 		return required_pae
 
@@ -1149,7 +1157,7 @@ class AfPrediction():
 		interacting_region = {}
 		interacting_region[chain1] = prot1_res
 		interacting_region[chain2] = prot2_res
-		contact_map, plddt1, plddt2, pae = self.get_interaction_data( prot1_res, prot2_res )
+		contact_map, plddt1, plddt2, pae = self.get_interaction_data( res_dict, prot1_res, prot2_res )
 		plddt_matrix, pae = self.apply_confidence_cutoffs( plddt1, plddt2, pae )
 		confident_interactions = contact_map * plddt_matrix * pae
 
