@@ -233,6 +233,7 @@ class Disobind():
 			if len( pair.split( "," ) ) == 6:
 				uni_id1, start1, end1, uni_id2, start2, end2 = pair.split( "," )
 				af_struct_file, af_json_file = None, None
+				chain1, chain2, offset1, offset2 = None, None, None, None
 
 			elif len( pair.split( "," ) ) == 12:
 				( uni_id1, start1, end1, uni_id2, start2, end2,
@@ -246,11 +247,11 @@ class Disobind():
 			af_dict[entry_id] = {
 						"struct_file": af_struct_file,
 						"json_file": af_json_file,
-						"chain1": chain1,
-						"chain2": chain2,
-						"offset1": offset1,
-						"offset2": offset2
-						}
+						"required_chains": {
+										"chains": [chain1, chain2],
+										"offsets": [offset1, offset2]
+										 }
+									}
 
 		return headers, af_dict
 
@@ -614,10 +615,14 @@ class Disobind():
 					_, cg = cg.split( "_" )
 
 					# Get AF2 pred for the entry.
-					model_file, pae_file = af_dict[entry_id]
-					# If AF2 input is not provided.
-					if model_file != None:
-						af_obj = AfPrediction( struct_file_path = model_file, data_file_path = pae_file )
+					model_file = af_dict[entry_id]["struct_file"]
+					pae_file = af_dict[entry_id]["json_file"]
+					required_chains = af_dict[entry_id]["required_chains"]
+					# If AF2 input is provided.
+					if model_file is not None:
+						af_obj = AfPrediction( struct_file_path = model_file, data_file_path = pae_file,
+												required_chains = required_chains )
+
 						af2_pred = af_obj.get_confident_interactions( [int( start1 ), int( end1 )],
 																	[int( start2 ), int( end2 )] )
 
@@ -804,11 +809,13 @@ class Disobind():
 ##-------------------------------------------------------------------------------##
 ###################################################################################
 class AfPrediction():
-	def __init__( self, struct_file_path: str, data_file_path: str ):
+	def __init__( self, struct_file_path: str, data_file_path: str, required_chains: Dict ):
 		# AF2/3 structure file path.
 		self.struct_file_path = struct_file_path
 		# AF2/3 structure data file path.
 		self.data_file_path = data_file_path
+		self.chains = required_chains["chains"]
+		self.offsets = list( map( int, required_chains["offsets"] ) )
 
 		# Max length for pad.
 		self.max_len = 100
@@ -823,15 +830,6 @@ class AfPrediction():
 		self.structure = self.get_structure( 
 									self.get_parser()
 									 )
-		# Get chains and sanity check for binary complex.
-		self.get_chains()
-		# Residue positions of all residues for each chain.
-		self.get_residue_positions()
-		self.get_chain_lengths( self.res_dict )
-		# Ca-coords of all residues for each chain.
-		self.get_ca_coordinates()
-		# Ca-plddt of all residues for each chain.
-		self.get_ca_plddt()
 		# Average PAE matrix.
 		self.get_pae()
 
@@ -853,17 +851,6 @@ class AfPrediction():
 		return parser
 
 
-	def get_chains( self ):
-		"""
-		Get the total no. of chains in the prediction.
-		Only binary complexes are allowed.
-		"""
-		self.chain_ids = [chain.id for model in self.structure for chain in model]
-
-		if len( self.chain_ids ) > 2:
-			raise Exception( "Too many chains. Does support non-binary complexes..." )
-
-
 	def get_structure( self, parser: Bio.PDB.PDBParser ):
 		"""
 		Return the Biopython Structure object for the input file.
@@ -874,16 +861,20 @@ class AfPrediction():
 		return structure
 
 
-	def get_residues( self ):
+	def get_chains( self ):
 		"""
-		Get all residues in the structure.
+		A generator that yields all Chain objects from the structure.
 		"""
-		coords = []
-		for model in self.structure:
-			for chain in model:
-				chain_id = chain.id[0]
-				for residue in chain:
-					yield residue, chain_id
+		for chain in self.structure[0]:
+			yield chain
+
+
+	def get_residues( self, chain: str ):
+		"""
+		Get all residues in the specified chains from the structure.
+		"""
+		for residue in self.structure[0][chain]:
+			yield residue
 
 
 	def extract_perresidue_quantity( self, residue, quantity: str ): 
@@ -911,69 +902,6 @@ class AfPrediction():
 			raise Exception( f"Specified quantity: {quantity} does not exist..." )
 
 
-	def get_residue_positions( self ):
-		"""
-		Get the residue positions for all residues.
-		"""
-		res_dict = {}
-		for residue, chain_id in self.get_residues():
-			res_id = self.extract_perresidue_quantity( residue, "res_pos" )
-			if chain_id not in res_dict.keys():
-				res_dict[chain_id] = np.array( res_id )
-			else:
-				res_dict[chain_id] = np.append( res_dict[chain_id], res_id )
-
-		self.res_dict = {k: v.reshape( -1, 1 ) for k, v in res_dict.items()}
-
-
-
-	def get_chain_lengths( self, res_dict: Dict ):
-		"""
-		Create a dict containing the length of all chains in the system 
-			and the total length of the system.
-		"""
-		lengths_dict = {}
-		lengths_dict["total"] = 0
-		for chain in res_dict:
-			chain_length = len( res_dict[chain] )
-			lengths_dict[chain] = chain_length
-			lengths_dict["total"] += chain_length
-
-		self.lengths_dict = lengths_dict
-
-
-	def get_ca_coordinates( self ):
-		"""
-		Get the coordinates for all Ca atoms of all residues.
-		"""
-		coords_dict = {}
-		for residue, chain_id in self.get_residues():
-			coords = self.extract_perresidue_quantity( residue, "coords" )
-			if chain_id not in coords_dict.keys():
-				coords_dict[chain_id] = np.array( coords )
-			else:
-				coords_dict[chain_id] = np.append( coords_dict[chain_id], coords )
-
-		self.coords_dict = {k: v.reshape( -1, 3 ) for k, v in coords_dict.items()}
-
-
-
-	def get_ca_plddt( self ):
-		"""
-		Get the pLDDT score for all Ca atoms of all residues.
-		"""
-		plddt_dict = {}
-		for residue, chain_id in self.get_residues():
-			plddt = self.extract_perresidue_quantity( residue, "plddt" )
-			if chain_id not in plddt_dict.keys():
-				plddt_dict[chain_id] = np.array( [plddt] )
-			else:
-				plddt_dict[chain_id] = np.append( plddt_dict[chain_id], plddt )
-
-		self.plddt_dict = {k: v.reshape( -1, 1 ) for k, v in plddt_dict.items()}
-
-
-
 	def get_data_dict( self ):
 		"""
 		Parse the AF2/3 data file.
@@ -989,7 +917,6 @@ class AfPrediction():
 			raise Exception( "Incorrect file format.. Suported .json only." )
 
 		return data[0]
-
 
 
 	def get_pae( self ):
@@ -1008,102 +935,164 @@ class AfPrediction():
 		self.pae = ( pae + pae.T )/2
 
 
-
-	def get_chains_n_indices( self, interacting_region: Dict ):
+	def add_offset( self, curr_res: int, offset: int ):
 		"""
-		Obtain the chain IDs and residues indices 
-			for the required interacting region.
-		residue_index = residue_position - 1
+		Add the specified offset to the residue position.
 		"""
-		chain1, chain2 = interacting_region.keys()
-		mol1_res1, mol1_res2 = interacting_region[chain1]
-		mol1_res1 -= 1
-		mol2_res1, mol2_res2 = interacting_region[chain2]
-		mol2_res1 -= 1
-
-		return [chain1, chain2], [mol1_res1, mol1_res2], [mol2_res1, mol2_res2]
+		return curr_res + offset
 
 
-
-	def get_required_coords( self, chains: List, mol1_res: List, mol2_res: List ):
+	def is_start_residue( self, curr_res: int, prot_res: List ):
 		"""
-		Get the coordinates for the interacting region 
-			for which confident interactions are required.
+		Check if a residue is the fragment start residue.
+		Assuming that the offset is already added.
 		"""
-		chain1, chain2 = chains
-		start1, end1 = mol1_res
-		start2, end2 = mol2_res
-		coords1 = self.coords_dict[chain1][start1:end1,:]
-		coords2 = self.coords_dict[chain2][start2:end2,:]
-
-		return coords1, coords2
+		return curr_res == prot_res[0]
 
 
-
-	def get_required_plddt( self, chains: List, mol1_res: List, mol2_res: List ):
+	def is_fragment_residue( self, curr_res: int, prot_res: List ):
 		"""
-		Get the plddt for the interacting region 
-			for which confident interactions are required.
+		A residue is valid if it belongs to the required protein fragment.
+		Assuming that the offset is already added.
 		"""
-		chain1, chain2 = chains
-		start1, end1 = mol1_res
-		start2, end2 = mol2_res
-		plddt1 = self.plddt_dict[chain1][start1:end1]
-		plddt2 = self.plddt_dict[chain2][start2:end2]
-
-		return plddt1, plddt2
-
+		start, end = prot_res
+		if curr_res >= start and curr_res <= end:
+			valid = True
+		else:
+			valid = False
+		return valid
 
 
-	def get_required_pae( self, chains: List, mol1_res: List, mol2_res: List ):
+	def get_required_residues( self, prot1_res: List, prot2_res: List ):
+		"""
+		The AF2 prediction may contain:
+			Structure for a non-binary complex containing protein1 and protein2.
+			Structure for the full length protein1 and protein2.
+			Structure for a fragment containing residues specified by prot1_res and prot2_res.
+			Structure for the fragment specified by prot1_res and prot2_res.
+		A generator that yields Residue objects for the required fragment residues.
+		"""
+		res_dict = {}
+		# For both the protein fragments.
+		for i, prot_res in enumerate( [prot1_res, prot2_res] ):
+			chain = self.chains[i]
+			offset = self.offsets[i]
+			for residue in self.get_residues( chain ):
+				res_id = self.extract_perresidue_quantity( residue, "res_pos" )
+				offset_res_id = self.add_offset( res_id, offset )
+				# Select only residues part of the fragment.
+				if self.is_fragment_residue( offset_res_id, prot_res ):
+					if chain not in res_dict.keys():
+						res_dict[chain] = [residue]
+					else:
+						res_dict[chain].append( residue )
+		return res_dict
+
+
+	def get_indices_for_pae( self, prot1_res: List, prot2_res: List ):
+		"""
+		Get the indices for the fragment start and end residues to 
+			select required elements in PAE matrix.
+		Essentially count all residues upto the start and end residue of the fragment.
+		"""
+		frag_index_dict = {k:[] for k in ["prot1", "prot2"]}
+		# Count the no. of residue till the start residue of a fragment.
+		total_length = 0
+		# For all chains.
+		for chain in self.get_chains():
+			chain_id = chain.id
+			
+			for residue in self.get_residues( chain_id ):
+				res_id = self.extract_perresidue_quantity( residue, "res_pos" )
+				
+				# For both the protein fragments.
+				for i, prot_res in enumerate( [prot1_res, prot2_res] ):
+					key = f"prot{i+1}"
+					# Do not check residues in a chain again if the indices have been accounted.
+					if frag_index_dict[key] == []:
+						if self.chains[i] == chain_id:
+							offset = self.offsets[i]
+							offset_res_id = self.add_offset( res_id, offset )
+							if self.is_start_residue( offset_res_id, prot_res ):
+								frag_len = prot1_res[1] - prot1_res[0] + 1
+								# Start index is the no. of residues till the start residue.
+								start_idx = total_length
+								# End index is the start index plus the fragment length.
+								end_idx = start_idx + frag_len
+								frag_index_dict[key] = [start_idx, end_idx]
+								break
+				total_length += 1
+
+		return frag_index_dict
+
+
+	def get_required_coords( self, res_dict: Dict ):
+		"""
+		Get the coordinates for all Ca atoms of all residues.
+		"""
+		coords_dict = {}
+		for chain in res_dict:
+			for residue in res_dict[chain]:
+				coords = self.extract_perresidue_quantity( residue, "coords" )
+				if chain not in coords_dict.keys():
+					coords_dict[chain] = np.array( coords )
+				else:
+					coords_dict[chain] = np.append( coords_dict[chain], coords )
+
+		coords_dict = {k: v.reshape( -1, 3 ) for k, v in coords_dict.items()}
+		return coords_dict
+
+
+
+	def get_required_plddt( self, res_dict: Dict ):
+		"""
+		Get the pLDDT score for all Ca atoms of all residues.
+		"""
+		plddt_dict = {}
+		for chain in res_dict:
+			for residue in res_dict[chain]:
+				plddt = self.extract_perresidue_quantity( residue, "plddt" )
+				if chain not in plddt_dict.keys():
+					plddt_dict[chain] = np.array( [plddt] )
+				else:
+					plddt_dict[chain] = np.append( plddt_dict[chain], plddt )
+
+		plddt_dict = {k: v.reshape( -1, 1 ) for k, v in plddt_dict.items()}
+		return plddt_dict
+
+
+	def get_required_pae( self, prot1_res: List, prot2_res: List ):
 		"""
 		Get the PAE matrix for the interacting region.
 			For this we need the cumulative residue index 
 				uptil the required residue position.
 		"""
-		chain1, chain2 = chains
-		start1, end1 = mol1_res
-		start2, end2 = mol2_res
+		frag_index_dict = self.get_indices_for_pae( prot1_res, prot2_res )
 
-		# Count total residues till start1 and start2.
-		cum_start1, cum_start2 = 0, 0
-		for chain in self.res_dict:
-			if chain == chain1:
-				cum_start1 += start1
-				break
-			else:
-				cum_start1 += len( self.res_dict[chain] )
+		start1_idx, end1_idx = frag_index_dict["prot1"]
+		start2_idx, end2_idx = frag_index_dict["prot2"]
 
-		for chain in self.res_dict:
-			if chain == chain2:
-				cum_start2 += start2
-				break
-			else:
-				cum_start2 += len( self.res_dict[chain] )
+		required_pae = self.pae[start1_idx:end1_idx, start2_idx:end2_idx]
 
-		cum_end1 = cum_start1 + ( end1 - start1 )
-		cum_end2 = cum_start2 + ( end2 - start2 )
-
-		pae = self.pae[cum_start1:cum_end1, cum_start2:cum_end2]
-
-		return pae
+		return required_pae
 
 
-	def get_interaction_data( self, interacting_region ):
+	def get_interaction_data( self, prot1_res: List, prot2_res: List ):
 		"""
-		Get the interaction amp, pLDDT, and PAE for the interacting region.
+		Get the interaction map, pLDDT, and PAE for the interacting region.
 		"""
-		chains, mol1_res, mol2_res = self.get_chains_n_indices( interacting_region )
-
-		coords1, coords2 = self.get_required_coords( chains, mol1_res, mol2_res )
-
-		# Create a contact map or distance map as specified.
+		chain1, chain2 = self.chains
+		res_dict = self.get_required_residues( prot1_res, prot2_res )
+		coords_dict = self.get_required_coords( res_dict )
+		coords1 = coords_dict[chain1]
+		coords2 = coords_dict[chain2]
 		contact_map = get_contact_map( coords1, coords2, self.dist_threshold )
-		# interaction_map = get_interaction_map( coords1, coords2, 
-		# 										self.contact_threshold )
+		
+		plddt_dict = self.get_required_plddt( res_dict )
+		plddt1 = plddt_dict[chain1]
+		plddt2 = plddt_dict[chain2]
 
-		plddt1, plddt2 = self.get_required_plddt( chains, mol1_res, mol2_res )
-		pae = self.get_required_pae( chains, mol1_res, mol2_res )
+		pae = self.get_required_pae( prot1_res, prot2_res )
 
 		return contact_map, plddt1, plddt2, pae
 
@@ -1121,17 +1110,17 @@ class AfPrediction():
 		return plddt_matrix, pae
 
 
-	def get_confident_interactions( self, prot1_res, prot2_res ):
+	def get_confident_interactions( self, prot1_res: List, prot2_res: List ):
 		"""
 		For the specified regions in the predicted structure, 
 			obtain all confident interacting residue pairs.
 		Assuming that chain 1 and 2 will correspond to protein 1 and 2 respectively.
 		"""
-		chain1, chain2 = self.chain_ids
+		chain1, chain2 = self.chains
 		interacting_region = {}
 		interacting_region[chain1] = prot1_res
 		interacting_region[chain2] = prot2_res
-		contact_map, plddt1, plddt2, pae = self.get_interaction_data( interacting_region )
+		contact_map, plddt1, plddt2, pae = self.get_interaction_data( prot1_res, prot2_res )
 		plddt_matrix, pae = self.apply_confidence_cutoffs( plddt1, plddt2, pae )
 		confident_interactions = contact_map * plddt_matrix * pae
 
