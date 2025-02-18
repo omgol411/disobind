@@ -145,7 +145,8 @@ class Disobind():
 		tasks = []
 
 		if self.required_cg not in [0, 1, 5, 10]:
-			raise Exception( "Incorrect coarse-grained resolution specified. Choose from [0, 1, 5, 10]..." )
+			raise ValueError( "Incorrect coarse-grained resolution specified. \n" + 
+								"Choose from [0, 1, 5, 10]..." )
 
 		for obj in ["interaction", "interface"]:
 			if obj == "interaction" and not self.predict_cmap:
@@ -240,7 +241,7 @@ class Disobind():
 					af_struct_file, af_json_file, chain1, chain2, offset1, offset2 ) = pair.split( "," )
 
 			else:
-				raise Exception( f"Incorrect input format..." )
+				raise ValueError( f"Incorrect input format..." )
 
 			entry_id = f"{uni_id1}:{start1}:{end1}--{uni_id2}:{start2}:{end2}_0"
 			headers.append( entry_id )
@@ -322,7 +323,7 @@ class Disobind():
 				if len( seq ) != 0:
 					self.uniprot_seq[uni_id] = seq
 				else:
-					raise Exception( f"Unable o download seq for Uniprot ID: {uni_id}. Please retry..." )
+					raise RuntimeError( f"Unable to download seq for Uniprot ID: {uni_id}. Please retry..." )
 
 		print( "Unique Uniprot IDs = ", len( unique_uni_ids ) )
 		print( "Total Uniprot sequences obtained = ", len( self.uniprot_seq ) )
@@ -846,7 +847,7 @@ class AfPrediction():
 		elif "cif" in ext:
 			parser = MMCIFParser()
 		else:
-			raise Exception( "Incorrect file format.. Suported .pdb/.cif only." )
+			raise ValueError( "Incorrect file format.. Suported .pdb/.cif only." )
 
 		return parser
 
@@ -899,7 +900,7 @@ class AfPrediction():
 			return plddt
 		
 		else:
-			raise Exception( f"Specified quantity: {quantity} does not exist..." )
+			raise ValueError( f"Specified quantity: {quantity} does not exist..." )
 
 
 	def get_data_dict( self ):
@@ -914,7 +915,7 @@ class AfPrediction():
 			with open( self.data_file_path, "rb" ) as f:
 				data = json.load( f )
 		else:
-			raise Exception( "Incorrect file format.. Suported .json only." )
+			raise ValueError( "Incorrect file format.. Suported .json only." )
 
 		return data[0]
 
@@ -930,7 +931,7 @@ class AfPrediction():
 		if "predicted_aligned_error" in data.keys():
 			pae = np.array( data["predicted_aligned_error"] )
 		else:
-			raise Exception( "PAE matrix not found..." )
+			raise ValueError( "PAE matrix not found..." )
 
 		self.pae = ( pae + pae.T )/2
 
@@ -1001,9 +1002,11 @@ class AfPrediction():
 		# For all chains.
 		for chain in self.get_chains():
 			chain_id = chain.id
+			print( chain_id )
 			
 			for residue in self.get_residues( chain_id ):
 				res_id = self.extract_perresidue_quantity( residue, "res_pos" )
+				print( res_id, "  ", total_length )
 				
 				# For both the protein fragments.
 				for i, prot_res in enumerate( [prot1_res, prot2_res] ):
@@ -1019,6 +1022,7 @@ class AfPrediction():
 								start_idx = total_length
 								# End index is the start index plus the fragment length.
 								end_idx = start_idx + frag_len
+								print( prot_res, " -- ", start_idx, "  ", end_idx, "  ", total_length )
 								frag_index_dict[key] = [start_idx, end_idx]
 								break
 				total_length += 1
@@ -1068,21 +1072,23 @@ class AfPrediction():
 				uptil the required residue position.
 		"""
 		frag_index_dict = self.get_indices_for_pae( prot1_res, prot2_res )
-
+		print( frag_index_dict )
 		start1_idx, end1_idx = frag_index_dict["prot1"]
 		start2_idx, end2_idx = frag_index_dict["prot2"]
 
 		required_pae = self.pae[start1_idx:end1_idx, start2_idx:end2_idx]
+		print( required_pae )
+		print( required_pae.shape )
+		exit()
 
 		return required_pae
 
 
-	def get_interaction_data( self, prot1_res: List, prot2_res: List ):
+	def get_interaction_data( self, res_dict: Dict, prot1_res: List, prot2_res: List ):
 		"""
 		Get the interaction map, pLDDT, and PAE for the interacting region.
 		"""
 		chain1, chain2 = self.chains
-		res_dict = self.get_required_residues( prot1_res, prot2_res )
 		coords_dict = self.get_required_coords( res_dict )
 		coords1 = coords_dict[chain1]
 		coords2 = coords_dict[chain2]
@@ -1110,12 +1116,35 @@ class AfPrediction():
 		return plddt_matrix, pae
 
 
+	def validate_input( self, res_dict: Dict, prot1_res: List, prot2_res: List ):
+		"""
+		Check if the no. of residues selected is the same as the length of the fragment.
+		"""
+		for i, prot_res in enumerate( [prot1_res, prot2_res] ):
+			chain = self.chains[i]
+			start, end = prot_res
+			frag_len = end - start + 1
+
+			res_selected = len( res_dict[chain] )
+			if res_selected > frag_len:
+				raise ValueError( "It's raining residues.\n" + 
+							f"No. of residues selected - {res_selected} exceeds the fragment length - {frag_len}..." )
+			elif res_selected < frag_len:
+				raise ValueError( "Missing residues in predicted structures.\n" + 
+							f"No. of residues selected - {res_selected} is less than the fragment length - {frag_len}..." )
+
+
+
 	def get_confident_interactions( self, prot1_res: List, prot2_res: List ):
 		"""
 		For the specified regions in the predicted structure, 
 			obtain all confident interacting residue pairs.
 		Assuming that chain 1 and 2 will correspond to protein 1 and 2 respectively.
 		"""
+		res_dict = self.get_required_residues( prot1_res, prot2_res )
+		
+		self.validate_input( res_dict, prot1_res, prot2_res )
+		
 		chain1, chain2 = self.chains
 		interacting_region = {}
 		interacting_region[chain1] = prot1_res
