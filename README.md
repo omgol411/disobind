@@ -47,9 +47,11 @@ To run a Disobind prediction only, provide the input as:
 `UniProt_ID1,start1,end1,UniProt_ID2,start2,end2`.
 
 To run a Disobind+AF2 prediction, provide the input as:  
-`UniProt_ID1,start1,end1,UniProt_ID2,start2,end2,AF2_struct_file_path,AF2_pae_file_path`.
+`UniProt_ID1,start1,end1,UniProt_ID2,start2,end2,AF2_struct_file_path,AF2_pae_file_path,chain1,chain2,offset1,offset2`.
 
-AF2 structure for the complete UniProt sequences of protein1 and protein2 must be provided.
+Chain1,Chain2 represent the Chain IDs that correspond to the protein1/2 sequence fragment.
+Offset is an integer value that indicates the difference in the residue positions in the AF2 structure and UniProt position.  
+Offset = 0 if the AF2 structure corresponds to the full UniProt sequnce or just the sequence fragment.
 
 As an example see `example/test.csv`.  
 
