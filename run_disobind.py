@@ -36,14 +36,17 @@ from analysis.params import parameter_files
 
 
 """
-Script to obtain Disobind predictions for a user.
+Script to obtain Disobind or Disobind+AF2 predictions for a user.
 Inputs:
 	Disobind needs the UniProt IDs for both the proteins and the protein 1 (1st in the pair) must be an IDR.
 	The input must be provided in a csv file formatas shown below:
-	Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2,end_res2
+	For Disobind only
+		Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2
+	For Disobind+AF2
+		Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2,end_res2,af2_struct_file,af2_json_file,chain1,chain2,offset1,offset2
 
 Outputs:
-	Disobind predictions for all tasks and all CG resolutions.
+	Disobind, AF2, AF2+Disobind predictions for all tasks and all CG resolutions.
 """
 
 class Disobind():
@@ -632,30 +635,30 @@ class Disobind():
 
 						# Get Disobind+AF2 output.
 						m, n = uncal_output.shape
-						af2_diso = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
-						af2_diso = np.max( af2_diso, axis = 1 ).reshape( m, n )
+						diso_af2 = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
+						diso_af2 = np.max( diso_af2, axis = 1 ).reshape( m, n )
 
 						# print( np.count_nonzero( af2_pred ) )
 						# exit()
 
 						af2_pred, df_af2 = self.extract_model_output( entry_id, af2_pred, eff_len, "af2" )
-						af2_diso, df_af2_diso = self.extract_model_output( entry_id, af2_diso, eff_len, "af2_diso" )
+						diso_af2, df_diso_af2 = self.extract_model_output( entry_id, diso_af2, eff_len, "diso_af2" )
 
 					else:
-						af2_diso = np.array( [] )
+						diso_af2 = np.array( [] )
 						af2_pred = np.array( [] )
 						df_af2 = pd.DataFrame( {} )
-						df_af2_diso = pd.DataFrame( {} )
+						df_diso_af2 = pd.DataFrame( {} )
 
 					uncal_output, df_diso = self.extract_model_output( entry_id, uncal_output, eff_len, "diso" )
 
 					predictions[pair_id][entry_id][f"{obj}_{cg}"] = {
 																	"Disobind": np.float32( uncal_output ),
 																	"AF2": np.float32( af2_pred ),
-																	"AF2+Diso": np.float32( af2_diso ),
+																	"Diso+AF2": np.float32( diso_af2 ),
 																	"Final_diso_preds": df_diso,
 																	"Final_af2_preds": df_af2,
-																	"Final_af2_diso_preds": df_af2_diso
+																	"Final_af2_diso_preds": df_diso_af2
 																		}
 					print( f"{idx} ------------------------------------------------------------\n" )
 		return predictions
