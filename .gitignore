@@ -1,0 +1,15 @@
+/output
+/example
+__pycache__/
+
+/output_*
+/omg
+/diso_*
+/dp1_dsc2a_100
+/dp1_dsg2_100
+/dp1_pg_100
+/dp1_pkp2a_100
+/dsc2a_dsg2_100
+/pkp2a_dsc2a_100
+/pkp2a_dsg2_100
+/pkp2a_pg_100
