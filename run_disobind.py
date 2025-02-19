@@ -630,16 +630,12 @@ class Disobind():
 						af2_pred = af_obj.get_confident_interactions( [int( start1 ), int( end1 )],
 																	[int( start2 ), int( end2 )] )
 
-						# af2_pred = self.get_af_pred( model_file = model_file, pae_file = pae_file )
 						af2_pred = self.process_af2_pred( af2_pred )
 
 						# Get Disobind+AF2 output.
 						m, n = uncal_output.shape
 						diso_af2 = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
 						diso_af2 = np.max( diso_af2, axis = 1 ).reshape( m, n )
-
-						# print( np.count_nonzero( af2_pred ) )
-						# exit()
 
 						af2_pred, df_af2 = self.extract_model_output( entry_id, af2_pred, eff_len, "af2" )
 						diso_af2, df_diso_af2 = self.extract_model_output( entry_id, diso_af2, eff_len, "diso_af2" )
@@ -682,10 +678,12 @@ class Disobind():
 			af2_pred = af2_pred.squeeze( [0, 1] ).numpy()
 
 		if "interface" in self.objective[0]:
+			# af2_pred is laready padded to [100, 100].
 			p1 = np.zeros( ( af2_pred.shape[0], 1 ) )
 			p2 = np.zeros( ( af2_pred.shape[0], 1 ) )
 
 			idx = np.where( af2_pred )
+
 			p1[idx[0]] = 1
 			p2[idx[1]] = 1
 			af2_pred = np.concatenate( [p1, p2], axis = 1 )
@@ -798,9 +796,8 @@ class Disobind():
 				df["Residue2"] = []
 
 		elif "interface" in  obj:
-			# output = output.reshape( ( 2*eff_len[0], 1 ) )
-			interface1 = output[:eff_len[0]][:len_p1]
-			interface2 = output[eff_len[0]:][:len_p2]
+			interface1 = output[:][:len_p1]
+			interface2 = output[:][:len_p2]
 			idx1 = np.where( interface1 >= self.threshold )[0]
 			idx2 = np.where( interface2 >= self.threshold )[0]
 
