@@ -204,7 +204,7 @@ class Disobind():
 			t_end = time.time()
 			print( f"Time taken for batch {start}-{end} = {( t_end - t_start )/60} minutes\n" )
 
-			# subprocess.call( ["rm", f"{self.emb_file}", f"{self.fasta_file}"] )
+			subprocess.call( ["rm", f"{self.emb_file}", f"{self.fasta_file}"] )
 
 
 ###################################################################################
