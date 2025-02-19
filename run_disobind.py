@@ -204,7 +204,7 @@ class Disobind():
 			t_end = time.time()
 			print( f"Time taken for batch {start}-{end} = {( t_end - t_start )/60} minutes\n" )
 
-			subprocess.call( ["rm", f"{self.emb_file}", f"{self.fasta_file}"] )
+			# subprocess.call( ["rm", f"{self.emb_file}", f"{self.fasta_file}"] )
 
 
 ###################################################################################
@@ -907,18 +907,20 @@ class AfPrediction():
 		rep_atom = "CA"
 
 		if quantity == "res_pos":
-			return residue.id[1]
+			result = residue.id[1]
 
 		elif quantity == "coords":
 			coords = residue[rep_atom].coord
-			return coords
+			result = coords
 		
 		elif quantity == "plddt":
 			plddt = residue[rep_atom].bfactor
-			return plddt
+			result = plddt
 		
 		else:
 			raise ValueError( f"Specified quantity: {quantity} does not exist..." )
+
+		return result
 
 
 	def get_data_dict( self ):
@@ -1033,7 +1035,7 @@ class AfPrediction():
 							offset = self.offsets[i]
 							offset_res_id = self.add_offset( res_id, offset )
 							if self.is_start_residue( offset_res_id, prot_res ):
-								frag_len = prot1_res[1] - prot1_res[0] + 1
+								frag_len = prot_res[1] - prot_res[0] + 1
 								# Start index is the no. of residues till the start residue.
 								start_idx = total_length
 								# End index is the start index plus the fragment length.
