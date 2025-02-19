@@ -204,7 +204,7 @@ class Disobind():
 			t_end = time.time()
 			print( f"Time taken for batch {start}-{end} = {( t_end - t_start )/60} minutes\n" )
 
-			subprocess.call( ["rm", f"{self.emb_file}", f"{self.fasta_file}"] )
+			# subprocess.call( ["rm", f"{self.emb_file}", f"{self.fasta_file}"] )
 
 
 ###################################################################################
@@ -602,7 +602,7 @@ class Disobind():
 																						prot1 = prot1_emb, 
 																						prot2 = prot2_emb )
 					
-					# get model predictions.
+					# Get model predictions.
 					with torch.no_grad():
 						uncal_output = model( prot1, prot2 )
 						
@@ -611,8 +611,10 @@ class Disobind():
 					uncal_output = uncal_output.detach().cpu().numpy()
 					target_mask = target_mask.detach().cpu().numpy()
 
+					# Shape must be [m, n] --> m and n are padded lengths of prot1/2.
 					if "interaction" in self.objective[0]:
 						uncal_output = uncal_output.reshape( eff_len )
+					# Shape must be [m+n, 1].
 					elif "interface" in self.objective[0]:
 						uncal_output = uncal_output.reshape( 2*eff_len[0], 1 )
 
@@ -634,6 +636,7 @@ class Disobind():
 
 						# Get Disobind+AF2 output.
 						m, n = uncal_output.shape
+						# Here Disobind output is not binary. But doesn't matter as we are just taking a max.
 						diso_af2 = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
 						diso_af2 = np.max( diso_af2, axis = 1 ).reshape( m, n )
 
@@ -686,7 +689,7 @@ class Disobind():
 
 			p1[idx[0]] = 1
 			p2[idx[1]] = 1
-			af2_pred = np.concatenate( [p1, p2], axis = 1 )
+			af2_pred = np.concatenate( [p1, p2], axis = 0 )
 
 		return af2_pred
 
@@ -750,7 +753,6 @@ class Disobind():
 		return len_p1, beads1, len_p2, beads2
 
 
-
 	def extract_model_output( self, entry_id: str, output: np.array, eff_len: List, name: str ):
 		"""
 		Reshape the model output and target into the required shape 
@@ -778,7 +780,6 @@ class Disobind():
 		len_p1, beads1, len_p2, beads2 = self.get_beads( cg, prot1, prot2 )
 		
 		if "interaction" in obj:
-			# output = output.reshape( eff_len )
 			output = output[:len_p1, :len_p2]
 			idx = np.where( output >= self.threshold )
 			df = pd.DataFrame()
@@ -796,8 +797,17 @@ class Disobind():
 				df["Residue2"] = []
 
 		elif "interface" in  obj:
-			interface1 = output[:][:len_p1]
-			interface2 = output[:][:len_p2]
+			m = eff_len[0]
+			if output.shape != ( 2*m, 1 ):
+				raise ValueError( f"Incorrect shape of output {output.shape}." +
+								f"Must be ( {2*m}, 1 )" )
+			
+			# 1st m residues belong to prot1.
+			interface1 = output[:m]
+			interface1 = interface1[:len_p1]
+			# Last m residues belong to prot2.
+			interface2 = output[m:]
+			interface2 = interface2[:len_p2]
 			idx1 = np.where( interface1 >= self.threshold )[0]
 			idx2 = np.where( interface2 >= self.threshold )[0]
 
