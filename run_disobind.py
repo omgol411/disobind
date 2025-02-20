@@ -685,7 +685,7 @@ class Disobind():
 			p1 = np.zeros( ( af2_pred.shape[0], 1 ) )
 			p2 = np.zeros( ( af2_pred.shape[0], 1 ) )
 
-			idx = np.where( af2_pred )
+			idx = np.where( af2_pred == 1 )
 
 			p1[idx[0]] = 1
 			p2[idx[1]] = 1
