@@ -7,7 +7,7 @@ Disobind is a deep learning method for predicting inter-protein contact maps and
 
 
 ## Publication and Data
-* Kartik Majila, Varun Ullanat, Shruthi Viswanath. **A deep learning method for predicting interactions for intrinsically disordered regions of proteins.** bioRxiv, [DOI](https://www.biorxiv.org/content/10.1101/2024.12.19.629373v2).
+* Kartik Majila, Varun Ullanat, Shruthi Viswanath. **A deep learning method for predicting interactions for intrinsically disordered regions of proteins.** bioRxiv, [DOI](https://www.biorxiv.org/content/10.1101/2024.12.19.629373v5).
 * Data is deposited in [Zenodo](https://www.doi.org/10.5281/zenodo.14504762)
 
 
@@ -36,6 +36,14 @@ chmod +x install.sh
 
 For using GPUs, ensure CUDA-toolkit (version 11.8) and the NVIDIA drivers are installed on the system.
 
+
+## Input requirements
+1. Disobind can only be used for binary complexes (AB). However, for non-binary complexes (ABC) the user can convert them into binary pairs (AB, BC, AC) to run Disobind.  
+2. The input protein pair is assumed to be interacting and Disobind tells where do they interact (contact maps and interface residues).  
+3. The input protein must be <= 100 residues in length. For longer proteins, the user can truncate the protein and run Disobind.  
+4. Protein 1 must be an IDR whereas Protein 2 may or may not be an IDR.  
+
+
 ## Prediction
 The input is a CSV file.
 
@@ -61,7 +69,7 @@ Run the following command to use Disobind for the example case with default sett
 python run_disobind.py -f ./example/test.csv 
 ```
 
-By default, Disobind provides interface predictions at a coarse-grained (CG) resolution 1.
+By default, Disobind provides interface predictions at a coarse-grained (CG) resolution 1.  
 
 ### Other options
 | Flags  |                                     Description                                                                           |
@@ -79,7 +87,6 @@ This script outputs the following files:
 * A CSV output file for all predictions for all input sequence fragment pairs.
 
 * `Predictions.npy`: contains predictions for all input sequence fragment pairs in a nested dictionary.
-
 
 
 ## Dataset creation
@@ -107,5 +114,5 @@ __Testable:__ Yes
 
 __Parallelizeable:__ Yes
 
-__Publications:__  Majila K., Ullanat V., Viswanath S. A deep learning method for predicting interactions for intrinsically disordered regions of proteins. bioRxiv  (2024), [DOI](https://www.biorxiv.org/content/10.1101/2024.12.19.629373v2).
+__Publications:__  Majila K., Ullanat V., Viswanath S. A deep learning method for predicting interactions for intrinsically disordered regions of proteins. bioRxiv  (2024), [DOI](https://www.biorxiv.org/content/10.1101/2024.12.19.629373v5).
 
