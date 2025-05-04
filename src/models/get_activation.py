@@ -29,7 +29,7 @@ def get_activation( activation_, device, param = None ):
 	if activation_ == "sigmoid":
 		return nn.Sigmoid()
 
-	if activation_ == "tanh":
+	elif activation_ == "tanh":
 		return nn.Tanh()
 
 	elif activation_ == "softmax":
@@ -71,4 +71,7 @@ def get_activation( activation_, device, param = None ):
 	elif activation_ == "logistic_activation":
 		x0, eta, train = param
 		return LogisticActivation( x0 = x0, eta = eta, train = train )
+	
+	else:
+		return None
 
