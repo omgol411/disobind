@@ -45,16 +45,16 @@ class Prediction():
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
 		# Dataset version,or ood mode.
-		self.version = 19
+		self.version = 21
 		# Input file containing the prot1/2 headers.
-		self.input_file = f"../database/v_19/prot_1-2_test_v_{self.version}.csv"
+		self.input_file = f"../database/v_{self.version}/prot_1-2_test_v_{self.version}.csv"
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
 		self.scope = "global"
 		self.device = "cuda" # cpu/cuda.
 		# Max protein length.
-		self.max_len = 100
+		self.max_len = 200
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
@@ -452,9 +452,9 @@ class Prediction():
 		if not f"{obj}_{cg}" in self.logs["counts"].keys():
 			self.logs["counts"][f"{obj}_{cg}"] = {}
 			if "interaction" in obj:
-				fields = ["IDR-IDR_interactions", "IDR-any_interactions"]
+				fields = ["IDR-IDR_interactions", "IDR-any_interactions", "Ordered_interactions"]
 			elif "interface" in obj:
-				fields = ["P1_IDR", "P2_IDR"]
+				fields = ["P1_IDR", "P2_IDR", "Ordered_interfaces"]
 			for k in fields:
 				self.logs["counts"][f"{obj}_{cg}"][k] = 0
 
@@ -478,6 +478,9 @@ class Prediction():
 		p1_pos = np.array( [1 if pos in disorder_positions1 else 0 for pos in p1_pos] ).reshape( -1, 1 )
 		p2_pos = np.array( [1 if pos in disorder_positions2 else 0 for pos in p2_pos] ).reshape( -1, 1 )
 
+		p1_ordered = np.where( p1_pos == 1, 0, 1 )
+		p2_ordered = np.where( p2_pos == 1, 0, 1 )
+
 		# Pad the binary disorder position vectors.
 		p1_pad = np.zeros( [self.max_len, 1] )
 		m = p1_pos.shape[0]
@@ -489,13 +492,27 @@ class Prediction():
 		p2_pad[:m, :] = p2_pos
 		p2_pos = p2_pad
 
-		print( obj, "  ", cg, " --> ", np.count_nonzero( p1_pos ), "  ", np.count_nonzero( p2_pos ) )
+		p1_order_pad = np.zeros( [self.max_len, 1] )
+		m = p1_ordered.shape[0]
+		p1_order_pad[:m, :] = p1_ordered
+		p1_ordered = p1_order_pad
+
+		p2_order_pad = np.zeros( [self.max_len, 1] )
+		m = p2_ordered.shape[0]
+		p2_order_pad[:m, :] = p2_ordered
+		p2_ordered = p2_order_pad
+
+		print( obj, "  ", cg, " --> ", np.count_nonzero( p1_pos ), "  ", np.count_nonzero( p2_pos ), "  ",
+				np.count_nonzero( p1_ordered ), "  ", np.count_nonzero( p2_ordered ) )
 		if "interaction" in obj:
 			# IDR-IDR interactions.
 			disorder_mat1 = p1_pos*p2_pos.T
 			# IDR-any interactions.
 			disorder_mat2 = p1_pos+p2_pos.T
 			disorder_mat2 = np.where( disorder_mat2 >= 1, 1, 0 )
+
+			# Matrix for ordered pair interactions.
+			order_mat = p1_ordered*p2_ordered.T
 
 			# Coarse grain the matrices.
 			if int( cg ) > 1:
@@ -505,11 +522,15 @@ class Prediction():
 				disorder_mat1 = m( disorder_mat1 ).squeeze( [0, 1] ).numpy()
 				disorder_mat2 = torch.from_numpy( disorder_mat2 ).unsqueeze( 0 ).unsqueeze( 0 ).float()
 				disorder_mat2 = m( disorder_mat2 ).squeeze( [0, 1] ).numpy()
+				# Matrix for ordered pair interactions.
+				order_mat = torch.from_numpy( order_mat ).unsqueeze( 0 ).unsqueeze( 0 ).float()
+				order_mat = m( order_mat ).squeeze( [0, 1] ).numpy()
 
 			self.logs["counts"][f"{obj}_{cg}"]["IDR-IDR_interactions"] += np.count_nonzero( disorder_mat1 )
 			self.logs["counts"][f"{obj}_{cg}"]["IDR-any_interactions"] += np.count_nonzero( disorder_mat2 )
+			self.logs["counts"][f"{obj}_{cg}"]["Ordered_interactions"] += np.count_nonzero( order_mat )
 
-			return disorder_mat1, disorder_mat2
+			return disorder_mat1, disorder_mat2, order_mat
 
 		elif "interface" in obj:
 			# Coarse grain the matrices.
@@ -522,12 +543,19 @@ class Prediction():
 				p2_pos = torch.from_numpy( p2_pos.T ).unsqueeze( 0 ).float()
 				p2_pos = m( p2_pos ).squeeze( 0 ).numpy().T
 
+				# Ordered interactions.
+				p1_ordered = torch.from_numpy( p1_ordered.T ).unsqueeze( 0 ).float()
+				p1_ordered = m( p1_ordered ).squeeze( 0 ).numpy().T
+				p2_ordered = torch.from_numpy( p2_ordered.T ).unsqueeze( 0 ).float()
+				p2_ordered = m( p2_ordered ).squeeze( 0 ).numpy().T
 				print( p1_pos.shape, "  ", p2_pos.shape )
-			self.logs["counts"][f"{obj}_{cg}"]["P1_IDR"] += np.count_nonzero( p1_pos )
-			self.logs["counts"][f"{obj}_{cg}"]["P2_IDR"] += np.count_nonzero( p2_pos )
 
 			disorder_pos = np.concatenate( [p1_pos, p2_pos], axis = 0 )
-			return disorder_pos, None
+			order_pos = np.concatenate( [p1_ordered, p2_ordered], axis = 0 )
+			self.logs["counts"][f"{obj}_{cg}"]["P1_IDR"] += np.count_nonzero( p1_pos )
+			self.logs["counts"][f"{obj}_{cg}"]["P2_IDR"] += np.count_nonzero( p2_pos )
+			self.logs["counts"][f"{obj}_{cg}"]["Ordered_interfaces"] += np.count_nonzero( order_pos )
+			return disorder_pos, None, order_pos
 
 		else:
 			raise Exception( f"Unrecognized objective {cg}..." )
@@ -594,13 +622,14 @@ class Prediction():
 					uncal_output = uncal_output.detach().cpu().numpy()
 					target_mask = target_mask.detach().cpu().numpy().reshape( uncal_output.shape )
 
-					disorder_mat1, disorder_mat2 = self.get_disorder_matrix( key, obj, cg )
+					disorder_mat1, disorder_mat2, order_mat = self.get_disorder_matrix( key, obj, cg )
 					
 					self.predictions[key][f"{obj}_{cg}"] = {
 													"Disobind_uncal": uncal_output,
 													"masks": target_mask,
 													"disorder_mat1": disorder_mat1,
 													"disorder_mat2": disorder_mat2,
+													"order_mat": order_mat
 														}
 
 					print( f"{idx} ------------------------------------------------------------\n" )

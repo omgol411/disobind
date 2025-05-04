@@ -25,7 +25,7 @@ Obtain the pLDDT and PAE too.
 class AF2MPredictions():
 	def __init__( self ):
 		# Dataset version.
-		self.version = 19
+		self.version = 21
 		# path for the dataset dir.
 		self.base_path = f"../database/v_{self.version}/"
 
@@ -36,9 +36,9 @@ class AF2MPredictions():
 		# PAE cutoff for confident predictions.
 		self.pae_threshold = 5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.75
+		self.iptm_cutoff = 0.0
 		# Max prot1/2 lengths.
-		self.max_len = 100
+		self.max_len = 200
 		self.pad = True
 		# Resolution of coarse graining.
 		self.coarse_grain_sizes = [1, 5, 10]

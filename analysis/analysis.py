@@ -18,7 +18,7 @@ from src.utils import plot_reliabity_diagram
 class JudgementDay():
 	def __init__( self ):
 		# Dataset version.
-		self.version = 19
+		self.version = 21
 		# path for the dataset dir.
 		self.base_path = f"../database/"
 		# Seed for the PRNGs.
@@ -26,9 +26,9 @@ class JudgementDay():
 		# Cutoff to dfine contact for disobind predictions.
 		self.contact_threshold = 0.5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.75
+		self.iptm_cutoff = 0.0
 		# Max prot1/2 lengths.
-		self.max_len = 100
+		self.max_len = 200
 		self.pad = True
 		self.device = "cuda"
 
@@ -97,7 +97,7 @@ class JudgementDay():
 
 	def prepare_target( self, target, task ):
 		if self.pad:
-			max_len = [100, 100]
+			max_len = [self.max_len, self.max_len]
 		else:
 			max_len = [target.shape]
 		
@@ -175,7 +175,8 @@ class JudgementDay():
 			# All fields to be included for the results.
 			ood_dict = {key:[] for key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
 											"Disobind_uncal", "Random_baseline", "masks", 
-											"disorder_mat1", "disorder_mat2", "targets"]}
+											"disorder_mat1", "disorder_mat2", "order_mat",
+											"targets"]}
 
 			# For all entries.
 			entry_ids = []
@@ -195,7 +196,8 @@ class JudgementDay():
 				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
 				# 	Ignoring these from evaluation.
 				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0", "O85041--O85043_0", "P25024--P10145_0"]:
+										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
+										"O85041--O85043_0", "P25024--P10145_0"]:
 					continue
 
 				entry_ids.append( key1 )
@@ -211,7 +213,7 @@ class JudgementDay():
 					elif "Disobind" in key2:
 						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
 
-					elif key2 in ["masks", "disorder_mat1", "disorder_mat2"]:
+					elif key2 in ["masks", "disorder_mat1", "disorder_mat2", "order_mat"]:
 						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
 
 					elif key2 == "targets":
@@ -269,16 +271,24 @@ class JudgementDay():
 			# AF2/AF3 pLDDT+PAE corrected predictions for IDR-IDR and IDR-any interactions.
 			preds_dict["AF2_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 			preds_dict["AF3_IDR-IDR"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
-
+			# Disobind predictions for IDR-IDR and IDR-any interactions.
+			preds_dict["Disobind_uncal_IDR-IDR"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat1"] )
 			preds_dict["AF2_Disobind_uncal_IDR-IDR"] = torch.from_numpy( af2_diso*ood_dict["disorder_mat1"] )
+
+			# Ordered residue interactions.
+			preds_dict["AF2_order"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["order_mat"] )
+			preds_dict["AF3_order"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["order_mat"] )
+			# Disobind predictions for ordered residue interactions.
+			preds_dict["Disobind_uncal_order"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["order_mat"] )
+			preds_dict["AF2_Disobind_uncal_order"] = torch.from_numpy( af2_diso*ood_dict["order_mat"] )
+
 			if "interaction" in task:
 				preds_dict["AF2_IDR-any"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
 				preds_dict["AF3_IDR-any"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
-			
-			# Disobind predictions for IDR-IDR and IDR-any interactions.
-			preds_dict["Disobind_uncal_IDR-IDR"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat1"] )
+
 			if "interaction" in task:
 				preds_dict["Disobind_uncal_IDR-any"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat2"] )
+				preds_dict["AF2_Disobind_uncal_IDR-any"] = torch.from_numpy( af2_diso*ood_dict["disorder_mat2"] )
 
 			# now calculate the metrics for all predictions.
 			for key in preds_dict.keys():
@@ -309,7 +319,7 @@ class JudgementDay():
 				results_dict[key].append( "" )
 
 		self.create_sparsity_f1_plots( results_dict )
-		self.case_specific_analysis()
+		# self.case_specific_analysis()
 
 		# Dump all calculated metrics on disk.
 		df = pd.DataFrame( results_dict )
@@ -318,10 +328,14 @@ class JudgementDay():
 		# Dump a subset of results o disk - for ease of looking.
 		subset_dict = {key:[] for key in results_dict.keys() if key not in ["AvgPrecision", "MCC", "AUROC", "Accuracy"]}
 		for i in range( len( results_dict["Model"] ) ):
-			if results_dict["Model"][i] in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE","Disobind_uncal", 
+			if results_dict["Model"][i] in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE","Disobind_uncal",
 											"AF2_Disobind_uncal", "AF3_Disobind_uncal",
-											"AF2_IDR-IDR", "AF3_IDR-IDR", "AF2_Disobind_uncal_IDR-IDR",
-											 "Disobind_uncal_IDR-IDR", "Disobind_uncal_IDR-any", ""]:
+											"AF2_IDR-IDR", "AF3_IDR-IDR", "Disobind_uncal_IDR-IDR",
+											"AF2_Disobind_uncal_IDR-IDR",
+											"AF2_order", "AF3_order", "Disobind_uncal_order",
+											"AF2_Disobind_uncal_order",
+											"AF2_IDR-any", "AF3_IDR-any", "Disobind_uncal_IDR-any",
+											"AF2_Disobind_uncal_IDR-any", ""]:
 				for key in subset_dict.keys():
 					subset_dict[key].append( results_dict[key][i] )
 
@@ -519,8 +533,8 @@ class JudgementDay():
 			uni_pos1 = np.arange( int( s1 ), int( e1 ) + 1, 1 )
 			uni_pos2 = np.arange( int( s2 ), int( e2 ) + 1, 1 )
 
-			idx1 = np.where( af2_diso[:100] == 1 )[0]
-			idx2 = np.where( af2_diso[100:] == 1 )[0]
+			idx1 = np.where( af2_diso[:self.max_len] == 1 )[0]
+			idx2 = np.where( af2_diso[self.max_len:] == 1 )[0]
 
 			uni_pos1 = ranges( uni_pos1[idx1] )
 			uni_pos1 = [f"{e[0]}-{e[1]}" for e in uni_pos1]
@@ -535,8 +549,8 @@ class JudgementDay():
 			uni_pos1 = np.arange( int( s1 ), int( e1 ) + 1, 1 )
 			uni_pos2 = np.arange( int( s2 ), int( e2 ) + 1, 1 )
 
-			idx1 = np.where( target[:100] == 1 )[0]
-			idx2 = np.where( target[100:] == 1 )[0]
+			idx1 = np.where( target[:self.max_len] == 1 )[0]
+			idx2 = np.where( target[self.max_len:] == 1 )[0]
 
 			uni_pos1 = ranges( uni_pos1[idx1] )
 			uni_pos1 = [f"{e[0]}-{e[1]}" for e in uni_pos1]
@@ -578,7 +592,7 @@ class JudgementDay():
 					metrics[6].item()
 					] ) #.reshape( 1, 7 )
 
-		return np.round( metric_array, 3 )
+		return np.round( metric_array, 2 )
 
 
 if __name__ == "__main__":
