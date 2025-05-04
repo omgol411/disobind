@@ -952,11 +952,15 @@ def get_superseding_pdb_id( pdb_id, max_trials = 10, wait_time = 5 ):
 		# break
 
 	else:
-		new_pdb_id = data["rcsb_repository_holdings_removed"]["id_codes_replaced_by"][0]
+		if "id_codes_replaced_by" in data["rcsb_repository_holdings_removed"].keys():
+			new_pdb_id = data["rcsb_repository_holdings_removed"]["id_codes_replaced_by"][0]
+		# If PDB ID has become obsolete and no new ID has been assigned (e.g. 8fg2).
+		else:
+			new_pdb_id = None
 
 	return new_pdb_id
 
-# print( get_superseding_pdb_id( "5v8h" ) )
+# print( get_superseding_pdb_id( "8fg2" ) )
 # exit()
 
 

@@ -21,6 +21,7 @@ import tqdm
 from multiprocessing import Pool
 import random
 import h5py
+import traceback
 
 from from_APIs_with_love import ( sifts_map_shell_command, 
 								download_SIFTS_Uni_PDB_mapping,
@@ -71,7 +72,7 @@ class parse_pdbs_for_idrs():
 		if self.create_dataset:
 			print( "------------------------------- Creating files for Disobind dataset...\n" )
 			self.uni_max_len = 10000 if self.create_dataset else None
-			self.max_len = 100
+			self.max_len = 200
 			self.min_len = 20
 			self.max_num_chains = 0
 			self.min_disorder_percent = 0.2
@@ -602,6 +603,8 @@ class parse_pdbs_for_idrs():
 		
 		# For logs.
 		# not_exist, deprecated_pdb, not_mapped, monomer = None, None, None, None
+		# PDB ID may not exist if: the ID is wrong or has become
+		# 	obsolete and no new ID has been assigned.
 		logs_dict = {key:[] for key in ["pdb_not_exist", "deprecated_pdb_id", 
 										"not_obtained_from_rest_api",
 										"chimeric", "np_entity", "no_SIFTS_mapping", "monomer",
@@ -610,6 +613,7 @@ class parse_pdbs_for_idrs():
 		logs_dict["all_uni_ids_in_pdb"] = []
 
 
+		output = []
 		for trial in range( self.max_trials ):
 			# Randomly delay each trial by a few seconds.
 			rn = np.random.uniform( 1, self.wait_time )
@@ -619,6 +623,10 @@ class parse_pdbs_for_idrs():
 				# Check if the PDB ID has been superseded by a new one.
 				# Use the new PDB ID if True.
 				pdb = get_superseding_pdb_id( pdb_id, max_trials = self.max_trials, wait_time = self.wait_time )
+				if pdb == None:
+					logs_dict["pdb_not_exist"].append( pdb )
+					pdb, pdb_df = None, None
+					break
 				pdb = pdb.lower()
 
 				if pdb != pdb_id:
@@ -629,10 +637,13 @@ class parse_pdbs_for_idrs():
 				if os.path.exists( f"{self.PDB_api_path}{pdb}_entry.json" ):
 					with open( f"{self.PDB_api_path}{pdb}_entry.json" ) as f:
 						entry_data = json.load( f )
+				else:
+					entry_data = None
+				if os.path.exists( f"{self.PDB_api_path}{pdb}_entity.json" ):
 					with open( f"{self.PDB_api_path}{pdb}_entity.json" ) as f:
 						entity_data = json.load( f )
 				else:
-					entry_data, entity_data = None, None
+					entity_data = None
 				
 				# Get entity and entry info from pdb. 
 				pdb_info = from_pdb_rest_api_with_love( pdb, 
@@ -755,9 +766,13 @@ class parse_pdbs_for_idrs():
 				if trial != self.max_trials-1:
 					continue
 				else:
-					print( f"Trial {trial}: Exception {e} \t --> {pdb}" )
+					print( f"Trial {trial}: Exception {e} \t --> {pdb} \n {traceback.print_exc()}" )
+					traceback
 					output = [0, pdb, None]
-		
+
+		if output == []:
+			output = [0, pdb, None]
+
 		return output
 
 

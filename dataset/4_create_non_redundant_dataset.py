@@ -36,7 +36,7 @@ class NonRedundantDataset():
 		self.tim = time.time()   # Just for calculating total time.
 		self.version = version
 		self.base_path = f"../database/{self.version}"
-		self.dataset_version = "100_20_0.2"
+		self.dataset_version = "200_20_0.2"
 		# Dir containing PDB/CIF files.
 		self.pdb_path = "../Combined_PDBs/"
 		# Dir containing PDB70 files.
@@ -114,7 +114,7 @@ class NonRedundantDataset():
 		# Check nonredunadncy for both proteins while creating OOD set.
 		# self.redundancyreduce_both = True
 		# Fraction of ODO keys to be consider for test set.
-		self.ood_fraction = 0.01
+		self.ood_fraction = 0.015
 		# sequence identity cutoff for ood set.
 		self.ood_ID_cutoff = 0.2
 		# Redundancy reduce the training set.
@@ -455,6 +455,7 @@ class NonRedundantDataset():
 		None
 		"""
 		if pdb70:
+			print( "Including PDB70 FASTA sequences..." )
 			with open( f"../{self.pdb70_rep_fasta_file}", "r" ) as f:
 				pdb70_fasta = f.readlines()
 
@@ -557,10 +558,6 @@ class NonRedundantDataset():
 				Use MMSeqs2 for clustering all prot1/2 sequence at --min-seq-id.
 				Consider Uniprot ID pairs for which uni_id1 and uni_id2 are singleton clusters 
 					or both are part of a doublet cluster.
-			3. Structure based non-redundancy check (computationally expensive).
-				Instead using only sequence based non-redundancy check with PDB70.
-				Consider Uniprot ID pairs for which both (or one of the two) 
-					Uniprot IDs do not cluster with any PDB70 chain.
 
 		Input:
 		----------
@@ -576,7 +573,7 @@ class NonRedundantDataset():
 			os.makedirs( self.ood_mm_dir )
 		os.chdir( self.ood_mm_dir )
 		
-		self.create_fasta_for_mseqs2( self.entry_dict.keys(), self.ood_fasta_file )
+		self.create_fasta_for_mseqs2( self.entry_dict.keys(), self.ood_fasta_file, pdb70 = True )
 		mmseqs_cluster( self.ood_fasta_file, self.name2, 
 						self.mmseqs_algo, self.ood_ID_cutoff, self.mmseqs_cluster_mode )
 
@@ -723,7 +720,6 @@ class NonRedundantDataset():
 		None
 		"""
 		print( "\n------------------------------------------------------------------" )
-		print( "Redundancy reducing training set..." )
 		with open( self.test_keys_file, "r" ) as f:
 			test_keys = f.readlines()[0].split( "," )
 
@@ -731,6 +727,7 @@ class NonRedundantDataset():
 
 		# Redundancy reduce training set if specified.
 		if self.redundancyreduce_train:
+			print( "Redundancy reducing training set..." )
 			if not os.path.exists( self.train_mm_dir ):
 				os.makedirs( self.train_mm_dir )
 			os.chdir( self.train_mm_dir )
@@ -839,20 +836,18 @@ class NonRedundantDataset():
 			for entry_id in test_entry_ids[start:end]:
 				af3_entry = {}
 				af3_entry["name"] = entry_id
-				af3_entry["modelSeeds"] = []
+				af3_entry["modelSeeds"] = [1]
 				af3_entry["sequences"] = [
 									{
 									"proteinChain": {
-
 											"sequence": self.test_dict[entry_id]["prot1_seq"],
 											"count": 1
-									},
+									} },
+									{
 									"proteinChain": {
-
 											"sequence": self.test_dict[entry_id]["prot2_seq"],
 											"count": 1
-									}
-									}
+									} }
 				]
 
 				af3_batch.append( af3_entry )
@@ -982,7 +977,7 @@ class NonRedundantDataset():
 			# w.writelines( f"Redundancy reduce both seq for OOD set = {self.redundancyreduce_both}\n" )
 			w.writelines( f"OOD min-seq-id = {self.ood_ID_cutoff}\n" )
 			w.writelines( f"Test set fraction = {self.ood_fraction}\n" )
-			w.writelines( f"TM score cutoff = {self.tm_cutoff}\n" )
+			# w.writelines( f"TM score cutoff = {self.tm_cutoff}\n" )
 			w.writelines( f"MMSeqs2 args: Algorithm = {self.mmseqs_algo} \t Cluster mode = {self.mmseqs_cluster_mode}\n" )
 			# w.writelines( f"USalign args: mol = {self.mol} \t ter = {self.ter}\n" )
 

@@ -361,8 +361,8 @@ def ProtT5_embeddings( input_file, output_file ):
 
 	print( "Generating ProtT5 embeddings..." )
 	#  (TODO for later) Clean this path issue.
-	T5_dir = os.path.abspath( "ProtTrans/Embedding/" ) # Use for inference.
-	# T5_dir = "../ProtTrans/Embedding/" # Use while creating embedding for training and analysis.
+	# T5_dir = os.path.abspath( "ProtTrans/Embedding/" ) # Use for inference.
+	T5_dir = "../ProtTrans/Embedding/" # Use while creating embedding for training and analysis.
 	main_dir = "../../dataset/"
 	# input_file = f"../../Scripts/{input_file}"
 	# output_file = f"../../Scripts/{output_file}"
