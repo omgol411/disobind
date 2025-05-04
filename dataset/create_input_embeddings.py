@@ -28,7 +28,7 @@ class Embeddings():
 		# Set seed for all PRNGs.
 		self.seed_worker()
 		# Version for the dataset directory.
-		self.version = 19
+		self.version = 21
 		# self.imbl_sampler = None  # ["None", "smote", "adasyn"]  # Deprectaed
 		# Whether to create global or local embeddings.
 		self.scope = "global" if scope == None else scope
@@ -39,7 +39,7 @@ class Embeddings():
 		# Train:Dev:Test set partitions to be created.
 		self.partitions = [0.9, 0.05, 0.05]
 		# Max length for prot1/2.
-		self.max_len = 100
+		self.max_len = 200
 		# Length of flanking region to be consider for global embeddings.
 		self.flanking_region = None
 
