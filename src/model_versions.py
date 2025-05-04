@@ -15,14 +15,14 @@ Use the following script to define the model configurations for model training.
     The script generates a version_*.yml file used as input for hparams_search.py script.
 """
 # Version of the dataset used for developing the model.
-dataset_version = 19
+dataset_version = 23
 # Select from models in src/models/
 model = "Epsilon_3" 
 emb = "T5"             # ["T5", "ProstT5", "ProSE", "BERT"]
 emb_type = "global"    # ["global", "local"]
 # ["obj", "bin_size", "pool type", "bin_post_proj", "bin_input", "single_output"]
 #       obj --> ["interaction", "interface", "interaction_bin", "interface_bin"]
-objective = ["interface_bin", 10, "avg", False, True, False]
+objective = ["interaction", 1, "", False, False, False]
 # Specify location for storing ablation results. For no ablations set it to "".
 ablations_dir = "" # "Ablations/"
 """
@@ -40,7 +40,7 @@ objective is list of 4 elements:
 """
 
 data = {
-    "Version": "5",
+    "Version": "12",
     "Embedding": f"{emb}",
     "Emb_type": f"{emb_type}",
     "Model": model,
@@ -55,21 +55,21 @@ data = {
             #  "bias" --> b in wx + b, 
             # "multiplier" --> scaling factor for auto3 proj_layer.
             #  "separate_proj_layer" --> use separate or common projection layer ["separate" or ""]]
-            "projection_layer": [[128, "ln2", True, 1, ""]],
+            "projection_layer": [[256, "ln2", True, 1, ""], [128, "ln2", True, 1, ""]],
             "output_dim": 1,
             # ["aggregate", "conactenate", "interface", "placement"]
             #       aggregate --> ["add", "substract", "multiply", "op-od", "dot", "cosine"]
             #       concatenate --> ["vanilla", "conact"]
             #       interface --> ["avg1d", "avg2d", "lin"]
             #       placement --> ["pre_proj", "post_concat", "post_hid", "post_out"] --> deprecataed
-            # "input_layer": ["op-od", "vanilla", ""],     # Uncomment for contact map model training
-            "input_layer": ["op-od", "vanilla", "lin"],  # Uncomment for interface model training
+            "input_layer": ["op-od", "vanilla", ""],     # Uncomment for contact map model training
+            # "input_layer": ["op-od", "vanilla", "lin"],  # Uncomment for interface model training
             # For Monte carlo dropout. #samples to be taken.
             "num_samples": 0,
             # ["#US_layers", "#DS_layers", "num_blocks", "scale_factor", 
             #               "hidden_block_type - vanilla/residual", 
             #               "residual_connection -- vanilla/addnorm/addactivnorm"]
-            "num_hid_layers": [[0, 0, 0, 0, "vanilla", ""]],
+            "num_hid_layers": [[0, 6, 0, 2, "vanilla", ""]],
             "bias": True,
             # [dropout1, dropout2, us_dropout, ds_dropout, mc_dropout]
             "dropouts": [[0.2, 0, 0, 0, 0]],
@@ -103,6 +103,8 @@ data = {
             "mask": [False, True],
             "num_metrics": [7, "global"],
             "Nruns": 1,
+            # Maximum sequence length.
+            "max_seq_len": 250,
             # ["bce", "bce_with_logits", "representation_loss", "count_reg_loss"] -- src/loss.py
             "loss": "se_loss",
             # Set weights to be used for loss calculation.
@@ -116,14 +118,14 @@ data = {
             "calibration": "None",
             # For gradient clipping.
             "max_norm": None,
-            "learning_rate": [1e-4],
+            "learning_rate": [5e-4],
             "scheduler": {
             # If True, usea lr scheduler else not.
                 "apply": True,
                 # ["linear", "exp", "multistep", "cycliclr", "swa"]
                 "name": "exp",
                 "milestone": [None],
-                "gamma": [0.93],
+                "gamma": [0.98],
                 "start_factor": None,
                 "end_factor": None,
                 "total_iters": None,
@@ -134,7 +136,7 @@ data = {
                 "step_size_down": None,
             },
             # Length of the journey.
-            "max_epochs": 25,
+            "max_epochs": 50,
             # Threshold for classifying a logit into contact/non-contact.
             "contact_threshold": [0.5],
             "save_model": True,
@@ -145,7 +147,4 @@ data = {
     }
 
 OmegaConf.save( config = data, f = "version_{}.yml".format( data["Version"] ) )
-
-
-
 
