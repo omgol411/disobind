@@ -1,24 +1,27 @@
 """
-Obtain entries from PEDS containing a complex.
+Obtain entries from PEDS containing a binary complex.
+Create input and output files for running Disobind.
 """
 ############ ------>"May the Force serve u well..." <------##############
 #########################################################################
-import json, os, subprocess
+import json, os, subprocess, json
 from typing import List, Tuple, Dict
 import numpy as np
 import pandas as pd
+import h5py
 from Bio.PDB import MMCIFParser
 
 from from_APIs_with_love import ( send_request, from_pdb_rest_api_with_love,
                                     download_SIFTS_Uni_PDB_mapping, get_sifts_mapping,
-                                    download_pdb )
+                                    download_pdb, get_uniprot_seq )
 from utility import ( load_PDB, get_coordinates, get_contact_map )
 
 
 class APedsTale():
     """
     Download entries from PEDS database for protein-protein complexes
-        along iwth other accessory information.
+        along with other accessory information.
+    Get input sequence pairs and corresponding output contact maps.
     """
     def __init__(self):
         self.base_dir = "../database/"
@@ -31,16 +34,23 @@ class APedsTale():
 
         self.valid_ped_entries_file = os.path.join( self.peds_dir, "valid_ped_entries.txt" )
         self.ped_pdbs_file = os.path.join( self.peds_dir, "ped_pdb_ids.txt" )
-        self.PED_complexes = {}
-        self.PED_complex_pdb = {}
+        self.peds_uni_seq_file = os.path.join( self.peds_dir, "Uniprot_seq_PEDS.json" )
+        self.peds_test_input = os.path.join( self.peds_dir, "ped_test_input.txt" )
+        self.peds_test_target = os.path.join( self.peds_dir, "ped_test_target.h5" )
+        
+        if os.path.exists( self.peds_uni_seq_file ):
+            with open( self.peds_uni_seq_file, "r" ) as f:
+                self.uni_seq_dict = json.load( f )
+        else:
+            self.uni_seq_dict = {}
 
         self.max_len = 200
         self.contact_threshold = 8
 
     def forward( self ):
         self.create_dir()
-        peds_dict = self.get_ped_entries()
-        self.save( peds_dict )
+        peds_dict, peds_data = self.get_ped_entries()
+        self.save( peds_dict, peds_data )
 
 
     def create_dir( self ):
@@ -91,17 +101,17 @@ class APedsTale():
         return valid
 
 
-    def is_complex_entry( self, data: Dict ) -> bool:
+    def is_binary_complex( self, data: Dict ) -> bool:
         """
         "construct_chains" -> list[Dict for all chains]
         For complexes, the "construct_chains" key should have length >1.
         """
-        if len( data["construct_chains"] ) == 1:
-            is_complex = False
+        if len( data["construct_chains"] ) != 2:
+            is_binary_complex = False
         # PED entries containing complexes.
         else:
-            is_complex = True
-        return is_complex
+            is_binary_complex = True
+        return is_binary_complex
 
 
     def has_missing_residues( self, data: Dict ) -> bool:
@@ -171,17 +181,18 @@ class APedsTale():
         return pdb_id
 
 
-    def get_pdb_info( self, pdb_id: str ) -> pd.DataFrame:
+    def get_data_from_pdb_api( self, pdb_id: str ) -> pd.DataFrame:
         """
         Get the entry and entity details for a
             given PDB ID using the PDB REST API.
         This considers only protein chains.
         """
-        result = from_pdb_rest_api_with_love( pdb_id )
-        # df, entry_data, entity_dict, chimeric, np_entity, total_chains, all_uni_ids = result
-        df, _, _, _, _, _, _ = result
         file_path = os.path.join( self.peds_pdb_details_dir, f"{pdb_id}.csv" )
         if not os.path.exists( file_path ):
+            result = from_pdb_rest_api_with_love( pdb_id )
+            # df, entry_data, entity_dict, chimeric, np_entity, total_chains, all_uni_ids = result
+            df, _, _, _, _, _, _ = result
+            
             df.to_csv( file_path, index = False )
         else:
             df = pd.read_csv( file_path )
@@ -193,17 +204,15 @@ class APedsTale():
         """
         Map the UniProt ID to the corresponding Auth Asym ID.
         """
-        uni_chain_map = {}
+        chain_uni_map = {}
         for i in range( df.shape[0] ):
             auth_asym_id = df.loc[i, "Auth Asym ID"]
             uni_id = df.loc[i, "Uniprot ID"]
 
             for aa_id in auth_asym_id.split( "," ):
-                if aa_id not in uni_chain_map:
-                    uni_chain_map[aa_id] = uni_id.split( "," )
-                else:
-                    uni_chain_map[aa_id].extend( uni_id.split( "," ) )
-        return uni_chain_map
+                chain_uni_map[aa_id] = {}
+                chain_uni_map[aa_id]["uni_id"] = uni_id.split( "," )
+        return chain_uni_map
 
 
     def get_pdb_uni_mapping( self, pdb_id: str ) -> Tuple[bool, pd.DataFrame]:
@@ -227,22 +236,26 @@ class APedsTale():
         return success, mapping
 
 
-    def get_uniprot_feats( self, mapping: pd.DataFrame, uni_chain_map: Dict ) -> Dict:
-        uni_feats = {}
+    def get_uniprot_feats( self, mapping: pd.DataFrame, chain_uni_map: Dict ) -> Dict:
+        """
+        Get UniProt residue positions from the SIFTS mapping for each chain.
+        """
         max_len_exceed = []
-        for chain, uni_id in uni_chain_map.items():
-            mapping_dict, _ = get_sifts_mapping( mapping = mapping, chain1 = chain, uni_id1 = uni_id )
-            uni_id = uni_id[0]
+        for chain in chain_uni_map:
+            uni_id = chain_uni_map[chain]["uni_id"][0]
+            mapping_dict, _ = get_sifts_mapping( mapping = mapping, chain1 = chain, uni_id1 = [uni_id] )
 
             if uni_id != mapping_dict["uni_id"]:
                 raise ValueError( "Mismatch in PDB and SIFTS UniProt ID..." )
-            uni_start_pos = mapping_dict["uni_pos"][0]
-            uni_end_pos = mapping_dict["uni_pos"][-1]
-            uni_feats["uni_id"] = [uni_start_pos, uni_end_pos]
+
             if len( mapping_dict["uni_pos"] ) > self.max_len:
                 max_len_exceed.append( True )
 
-        return uni_feats, any( max_len_exceed )
+            uni_start_pos = mapping_dict["uni_pos"][0]
+            uni_end_pos = mapping_dict["uni_pos"][-1]
+            chain_uni_map[chain]["uni_pos"] = [uni_start_pos, uni_end_pos]
+
+        return chain_uni_map, any( max_len_exceed )
 
 
     def download_pdb_struct( self, pdb_id: str ) -> bool:
@@ -261,32 +274,77 @@ class APedsTale():
         return success
 
 
-    def get_coordinates_from_pdb( self, pdb_id: str ):
+    def download_uniprot_seq( self, chain_uni_map: Dict ):
+        """
+        Download UniProt seq for all UniProt IDs in the input dict.
+        """
+        success = []
+        for chain in chain_uni_map:
+            uni_id = chain_uni_map[chain]["uni_id"][0]
+            
+            if uni_id in self.uni_seq_dict:
+                success.append( True )
+            else:
+                uni_seq = get_uniprot_seq( uni_id, max_trials = 5,
+                                            wait_time = 5,
+                                            return_id = False )
+                if uni_seq != []:
+                    success.append( True )
+                    self.uni_seq_dict[uni_id] = uni_seq
+                else:
+                    success.append( False )
+        return all( success )
+
+
+    def get_coordinates_from_pdb( self, pdb_id: str ) -> Dict:
         """
         A generator object that yields a dict containing
             coordinates for all chains in a model.
         """
-        structure = load_PDB( pdb_id,
-                            os.path.join( self.peds_pdb_struct_dir, f"{pdb_id}.cif") )
+        structure = load_PDB( pdb = pdb_id,
+                            pdb_path = self.peds_pdb_struct_dir )
         
         coords_dict = {}
         for model in structure:
             for chain in model:
                 chain_id = chain.id[0]
-                print( chain_id )
                 coords_dict[chain_id] = get_coordinates( chain, [] )
-        return coords_dict
+            yield coords_dict
 
 
-    def create_contact_maps( self, pdb_id: str ):
+    def create_contact_maps( self, pdb_id: str ) -> np.array:
         """
         Get the coordinates for all models in a PDB structure and create contact maps.
         Create summed contact maps and convert to binary contact maps.
         """
-        coords_dict = self.get_coordinates_from_pdb( pdb_id )
-        coords1, coords2 = coords_dict.values()
-        contact_map = get_contact_map( coords1, coords2, self.contact_threshold )
+        print( f"Creating contact map for {pdb_id}..." )
+        contact_map  =np.array( [] )
+        for coords_dict in self.get_coordinates_from_pdb( pdb_id ):
+            coords1, coords2 = coords_dict.values()
+            if contact_map.shape[0] == 0:
+                contact_map = get_contact_map( coords1, coords2, self.contact_threshold )
+            else:
+                contact_map += get_contact_map( coords1, coords2, self.contact_threshold )
+        contact_map = np.where( contact_map > 0, 1, 0 )
         return contact_map
+
+
+    def create_uni_id_pairs( self, chain_uni_map: Dict ):
+        """
+        Create UniProt ID pairs in the same format as the training and OOD sets:
+            "{Uni_ID1}:start_res:end_res--{Uni_ID2}:start_res:end_res_{copy_num}"
+        Assuimg a binary complex.
+        """
+        chain1, chain2 = chain_uni_map.keys()
+        uni_id1 = chain_uni_map[chain1]["uni_id"][0]
+        res1 = chain_uni_map[chain1]["uni_pos"]
+        uni_id2 = chain_uni_map[chain2]["uni_id"][0]
+        res2 = chain_uni_map[chain2]["uni_pos"]
+
+        uni_id_pair = f"{uni_id1}:{res1[0]}:{res1[1]}--{uni_id2}:{res2[0]}:{res2[1]}_0"
+
+        print( uni_id_pair )
+        return uni_id_pair
 
 
     def get_ped_entries( self ):
@@ -301,20 +359,19 @@ class APedsTale():
         Remove if:
             Not a valid PEDS ID.
             Has missing residues.
-            Not a complex entry.
+            Not a binary complex entry.
             Has no PDB ID.
             PDB has non-protein chains too.
             No SIFTS mapping.
             Any chain in PDB exceed max length.
         """
         peds_dict = {k:[] for k in ["valid_ped_entries", "pdb_ids"]}
-        valid_ped_entries = []
-        peds_pdb = []
+        peds_data = {"entry_id": [], "cmap": {}}
         ped_ids = self.get_ped_ids()
 
         for i, num_id in enumerate( ped_ids ):
             # num_id = "PED00002"
-            # num_id = "PED00492"
+            # num_id = "PED00105"
             print( "\n-------> ", num_id )
 
             data, entry_valid = self.get_data_from_peds_api( num_id )
@@ -326,6 +383,7 @@ class APedsTale():
             # print( "\n" )
             # print( data["description"].keys() )
             # print( data["description"]["entry_cross_reference"] )
+            # print( data["description"]["experimental_cross_reference"] )
             # print( data["ensembles"] )
             # exit()
             if not entry_valid:
@@ -337,7 +395,7 @@ class APedsTale():
             if missing:
                 print( "Missing residues" )
                 continue
-            if not self.is_complex_entry( data ):
+            if not self.is_binary_complex( data ):
                 continue
 
             print( f"Here exists a complex entry {num_id}..." )
@@ -346,15 +404,15 @@ class APedsTale():
                 continue
 
             if pdb_id not in peds_dict["pdb_ids"]:
-                df = self.get_pdb_info( pdb_id )
+                df = self.get_data_from_pdb_api( pdb_id )
                 # Should have 2 or more protein chains.
                 if df.shape[0] > 1:
-                    uni_chain_map = self.get_chain_uniprot_mapping( df )
+                    chain_uni_map = self.get_chain_uniprot_mapping( df )
 
                     success, mapping = self.get_pdb_uni_mapping( pdb_id )
                     if not success:
                         continue
-                    uni_feats, max_len_exceed = self.get_uniprot_feats( mapping, uni_chain_map )
+                    chain_uni_map, max_len_exceed = self.get_uniprot_feats( mapping, chain_uni_map )
 
                     if max_len_exceed:
                         print( f"{num_id} -> {pdb_id} exceds max length..." )
@@ -364,23 +422,46 @@ class APedsTale():
                     if not struct_success:
                         continue
 
+                    seq_success = self.download_uniprot_seq( chain_uni_map )
+                    if not seq_success:
+                        continue
+
+                    contact_map = self.create_contact_maps( pdb_id )
+
+                    # if np.count_nonzero( contact_map ) == 0:
+                    #     print( f"No contacts present at 8Angstorm in PDB: {pdb_id}..." )
+                    #     continue
+                    uni_id_pair = self.create_uni_id_pairs( chain_uni_map )
+                    peds_data["entry_id"].append( uni_id_pair )
+                    peds_data["cmap"][uni_id_pair] = contact_map
                     peds_dict["pdb_ids"].append( pdb_id )
 
 
         print( "Total valid PED entries found: ", len( peds_dict["valid_ped_entries"] ) )
         print( "Total PDB IDs obtained from PEDS: ", len( peds_dict["pdb_ids"] ) )
 
-        return peds_dict
+        return peds_dict, peds_data
 
 
-    def save( self, peds_dict: Dict ):
-        if not os.path.exists( self.valid_ped_entries_file ):
-            with open( self.valid_ped_entries_file, "w" ) as w:
-                w.writelines( ",".join( peds_dict["valid_ped_entries"] ) )
+    def save( self, peds_dict: Dict, peds_data: Dict ):
+        # if not os.path.exists( self.valid_ped_entries_file ):
+        with open( self.valid_ped_entries_file, "w" ) as w:
+            w.writelines( ",".join( sorted( peds_dict["valid_ped_entries"] ) ) )
 
-        if not os.path.exists( self.ped_pdbs_file ):
-            with open( self.ped_pdbs_file, "w" ) as w:
-                w.writelines( ",".join( peds_dict["pdb_ids"] ) )
+        # if not os.path.exists( self.ped_pdbs_file ):
+        with open( self.ped_pdbs_file, "w" ) as w:
+            w.writelines( ",".join( sorted( peds_dict["pdb_ids"] ) ) )
+
+        with open( self.peds_uni_seq_file, "w" ) as w:
+            json.dump( self.uni_seq_dict, w )
+
+        with open( self.peds_test_input, "w" ) as w:
+            w.writelines( ",".join( peds_data["entry_id"] ) )
+
+        hf = h5py.File( self.peds_test_target, "w" )
+        for k in peds_data["cmap"]:
+            hf.create_dataset( k, data = peds_data["cmap"][k] )
+
 
 APedsTale().forward()
 
