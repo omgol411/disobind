@@ -46,8 +46,6 @@ class Prediction():
 		self.input_type = "csv"
 		# Dataset version,or ood mode.
 		self.version = 21
-		# Input file containing the prot1/2 headers.
-		self.input_file = f"../database/v_{self.version}/prot_1-2_test_v_{self.version}.csv"
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
@@ -58,7 +56,7 @@ class Prediction():
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
-		self.mode = "ood"
+		self.mode = "peds"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
@@ -77,20 +75,31 @@ class Prediction():
 		self.ideal_path = f"../database/input_files/IDEAL.csv"
 		self.mobidb_path = f"../database/input_files/MobiDB.csv"
 
-		# Test contact maps file name.
-		self.cmaps_file =  f"../database/v_{self.version}/Target_bcmap_test_v_{self.version}.h5"
-		# Uniprot file name.
-		self.Uniprot_seq_file =  f"../database/v_{self.version}/Uniprot_seq.json"
 		# self.output_dir = f"Predictions_{self.mod}_{self.mod_ver}"
 		# Name for output directory.
 		if self.mode == "ood":
 			self.output_dir = f"Predictions_ood_v{self.version}"
 			# Filename to store predictions.
 			self.output_filename = "Disobind_Predictions.npy"
-		else:
-			self.output_dir = f"Disobind_Predictions"
+			# Input file containing the prot1/2 headers.
+			self.input_file = f"../database/v_{self.version}/prot_1-2_test_v_{self.version}.csv"
+			# Uniprot file name.
+			self.Uniprot_seq_file =  f"../database/v_{self.version}/Uniprot_seq.json"
+			# Test contact maps file name.
+			self.cmaps_file =  f"../database/v_{self.version}/Target_bcmap_test_v_{self.version}.h5"
+		elif self.mode == "peds":
+			self.output_dir = f"Predictions_peds/"
 			# Filename to store predictions.
-			self.output_filename = "Predictions.npy"		
+			self.output_filename = "Disobind_Predictions_peds.npy"
+			# Input file containing the prot1/2 headers.
+			self.input_file = f"../database/PEDS/ped_test_input.csv"
+			# Uniprot file name.
+			self.Uniprot_seq_file =  f"../database/PEDS/Uniprot_seq_PEDS.json"
+			# Test contact maps file name.
+			self.cmaps_file =  f"../database/PEDS/ped_test_target.h5"
+		else:
+			raise ValueError( "Incorrect mode specified (ood/peds supported)..." )
+
 		if os.path.exists( self.output_dir ):
 			reply = input( "Output directory already exists. Abort? (Y/n)\t" )
 			if reply == "Y":
@@ -639,7 +648,8 @@ class Prediction():
 			with open( self.disorder_file_path, "w") as w:
 				json.dump( self.disorder_dict, w )
 
-		self.plot_ood_dist()
+		if self.mode == "ood":
+			self.plot_ood_dist()
 
 
 	def extract_model_output( self, output, target, eff_len ):
