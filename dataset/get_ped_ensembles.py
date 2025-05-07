@@ -35,7 +35,7 @@ class APedsTale():
         self.valid_ped_entries_file = os.path.join( self.peds_dir, "valid_ped_entries.txt" )
         self.ped_pdbs_file = os.path.join( self.peds_dir, "ped_pdb_ids.txt" )
         self.peds_uni_seq_file = os.path.join( self.peds_dir, "Uniprot_seq_PEDS.json" )
-        self.peds_test_input = os.path.join( self.peds_dir, "ped_test_input.txt" )
+        self.peds_test_input = os.path.join( self.peds_dir, "ped_test_input.csv" )
         self.peds_test_target = os.path.join( self.peds_dir, "ped_test_target.h5" )
         
         if os.path.exists( self.peds_uni_seq_file ):
@@ -129,6 +129,23 @@ class APedsTale():
                 missing.append( False )
         return any( missing )
 
+
+    def check_seq_cmap_size( self, chain_uni_map: Dict, contact_map: np.array ):
+        """
+        Check if the lengths of the proteins match the size of contact maps or not.
+        Asuuming a binary complex.
+        """
+        chain1, chain2 = chain_uni_map.keys()
+        length1 = chain_uni_map[chain1]["length"]
+        length2 = chain_uni_map[chain2]["length"]
+
+        print( contact_map.shape, "  ", ( length1, length2 ), " --> ", contact_map.shape == ( length1, length2 ) )
+        if contact_map.shape == ( length1, length2 ):
+            success = True
+        else:
+            success = False
+
+        return success
 
 
     def get_ped_ids( self ) -> List:
@@ -253,7 +270,9 @@ class APedsTale():
 
             uni_start_pos = mapping_dict["uni_pos"][0]
             uni_end_pos = mapping_dict["uni_pos"][-1]
-            chain_uni_map[chain]["uni_pos"] = [uni_start_pos, uni_end_pos]
+            chain_uni_map[chain]["pdb_pos"] = mapping_dict["pdb_pos"]
+            chain_uni_map[chain]["uni_res"] = [uni_start_pos, uni_end_pos]
+            chain_uni_map[chain]["length"] = uni_end_pos - uni_start_pos + 1
 
         return chain_uni_map, any( max_len_exceed )
 
@@ -296,7 +315,7 @@ class APedsTale():
         return all( success )
 
 
-    def get_coordinates_from_pdb( self, pdb_id: str ) -> Dict:
+    def get_coordinates_from_pdb( self, pdb_id: str, chain_uni_map:Dict ) -> Dict:
         """
         A generator object that yields a dict containing
             coordinates for all chains in a model.
@@ -308,18 +327,20 @@ class APedsTale():
         for model in structure:
             for chain in model:
                 chain_id = chain.id[0]
-                coords_dict[chain_id] = get_coordinates( chain, [] )
+                if chain_id in chain_uni_map:
+                    res_pos = chain_uni_map[chain_id]["pdb_pos"]
+                    coords_dict[chain_id] = get_coordinates( chain, res_pos )
             yield coords_dict
 
 
-    def create_contact_maps( self, pdb_id: str ) -> np.array:
+    def create_contact_maps( self, pdb_id: str, chain_uni_map:Dict ) -> np.array:
         """
         Get the coordinates for all models in a PDB structure and create contact maps.
         Create summed contact maps and convert to binary contact maps.
         """
         print( f"Creating contact map for {pdb_id}..." )
         contact_map  =np.array( [] )
-        for coords_dict in self.get_coordinates_from_pdb( pdb_id ):
+        for coords_dict in self.get_coordinates_from_pdb( pdb_id, chain_uni_map ):
             coords1, coords2 = coords_dict.values()
             if contact_map.shape[0] == 0:
                 contact_map = get_contact_map( coords1, coords2, self.contact_threshold )
@@ -337,9 +358,9 @@ class APedsTale():
         """
         chain1, chain2 = chain_uni_map.keys()
         uni_id1 = chain_uni_map[chain1]["uni_id"][0]
-        res1 = chain_uni_map[chain1]["uni_pos"]
+        res1 = chain_uni_map[chain1]["uni_res"]
         uni_id2 = chain_uni_map[chain2]["uni_id"][0]
-        res2 = chain_uni_map[chain2]["uni_pos"]
+        res2 = chain_uni_map[chain2]["uni_res"]
 
         uni_id_pair = f"{uni_id1}:{res1[0]}:{res1[1]}--{uni_id2}:{res2[0]}:{res2[1]}_0"
 
@@ -426,7 +447,11 @@ class APedsTale():
                     if not seq_success:
                         continue
 
-                    contact_map = self.create_contact_maps( pdb_id )
+                    contact_map = self.create_contact_maps( pdb_id, chain_uni_map )
+
+                    success_size = self.check_seq_cmap_size( chain_uni_map, contact_map )
+                    if not success_size:
+                        continue
 
                     # if np.count_nonzero( contact_map ) == 0:
                     #     print( f"No contacts present at 8Angstorm in PDB: {pdb_id}..." )
@@ -435,7 +460,6 @@ class APedsTale():
                     peds_data["entry_id"].append( uni_id_pair )
                     peds_data["cmap"][uni_id_pair] = contact_map
                     peds_dict["pdb_ids"].append( pdb_id )
-
 
         print( "Total valid PED entries found: ", len( peds_dict["valid_ped_entries"] ) )
         print( "Total PDB IDs obtained from PEDS: ", len( peds_dict["pdb_ids"] ) )
@@ -460,6 +484,7 @@ class APedsTale():
 
         hf = h5py.File( self.peds_test_target, "w" )
         for k in peds_data["cmap"]:
+            print( k, " --> ", peds_data["cmap"][k].shape )
             hf.create_dataset( k, data = peds_data["cmap"][k] )
 
 
