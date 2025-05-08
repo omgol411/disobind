@@ -16,7 +16,7 @@ class Epsilon_3( nn.Module ):
     def __init__( self, emb_size, projection_layer, output_dim, 
                     activation1, activation2, input_layer,
                     num_samples, num_hid_layers, bias,
-                    dropouts, norm,
+                    max_len, dropouts, norm,
                     temperature, output_layer, objective, device ):
         super( Epsilon_3, self ).__init__()
         self.emb_size = emb_size
@@ -30,6 +30,7 @@ class Epsilon_3( nn.Module ):
         self.hidden_block = num_hid_layers[4:]
         self.bias = bias
         self.norm = norm
+        self.max_len = max_len
         self.dropout1 = nn.Dropout( p = dropouts[0] )
         self.dropout2 = nn.Dropout( p = dropouts[1] )
         self.us_dropout_prob = dropouts[2]
@@ -81,9 +82,9 @@ class Epsilon_3( nn.Module ):
 
         if self.input_layer_params[2] == "lin":
             if "bin" in self.objective[0]:
-                in_feat = 100//self.objective[1]
+                in_feat = self.max_len//self.objective[1]
             else:
-                in_feat = 100
+                in_feat = self.max_len
             self.interface = nn.Sequential( 
                                             nn.Linear( in_features = in_feat, out_features = 1, bias = True )
                                             )
