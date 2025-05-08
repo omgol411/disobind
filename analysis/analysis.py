@@ -14,11 +14,13 @@ from dataset.utility import ranges
 from src.metrics import torch_metrics
 from src.utils import plot_reliabity_diagram
 
+MAX_LEN_DICT = {19: 100, 21: 200, 23: 250}
 
 class JudgementDay():
 	def __init__( self ):
 		# Dataset version.
-		self.version = 21
+		self.data_version = 21
+		self.model_version = 21
 		# path for the dataset dir.
 		self.base_path = f"../database/"
 		# Seed for the PRNGs.
@@ -28,38 +30,43 @@ class JudgementDay():
 		# ipTM cutoff for confident predictions.
 		self.iptm_cutoff = 0.0
 		# Max prot1/2 lengths.
-		self.max_len = 200
+		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
 		self.device = "cuda"
 
 		# AF2 predictions file.
-		self.af2m_preds = f"./AF_preds_v{self.version}/Predictions_af2m_results_{self.iptm_cutoff}.npy"
+		self.af2m_preds = f"./AF_preds_v{self.data_version}/Predictions_af2m_results_{self.iptm_cutoff}.npy"
 		# AF3 predictions file.
-		self.af3_preds = f"./AF_preds_v{self.version}/Predictions_af3_results_{self.iptm_cutoff}.npy"
+		self.af3_preds = f"./AF_preds_v{self.data_version}/Predictions_af3_results_{self.iptm_cutoff}.npy"
 		# Disobind predictions file.
-		self.disobind_preds = f"./Predictions_ood_v{self.version}/Disobind_Predictions.npy"
+		self.disobind_preds = f"./Predictions_ood_v{self.data_version}/Disobind_Predictions.npy"
 
 		# OOD set target contact maps file.
-		self.target_cmap = f"{self.base_path}v_{self.version}/Target_bcmap_test_v_{self.version}.h5"
+		self.target_cmap = f"{self.base_path}v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
 		# Fraction of positives in the dataset for all tasks.
-		self.fraction_positives = f"{self.base_path}v_{self.version}/T5/global-None/fraction_positives.json"
+		self.fraction_positives = f"{self.base_path}v_{self.data_version}/T5/global-None/fraction_positives.json"
 		# File containing info about the merged binary complexes in the dataset.
-		self.merged_binary_complexes_dir = f"{self.base_path}v_{self.version}/merged_binary_complexes/"
+		self.merged_binary_complexes_dir = f"{self.base_path}v_{self.data_version}/merged_binary_complexes/"
 
-		self.output_dir = f"./Analysis_OOD_{self.version}_{self.iptm_cutoff}/"
+		# PEDS entries.
+		self.target_peds = f"{self.base_path}PEDS/ped_test_target.h5"
+		self.peds_preds = f"./Predictions_peds/Disobind_Predictions_peds.npy"
+
+		self.output_dir = f"./Analysis_OOD_{self.data_version}_{self.iptm_cutoff}/"
 
 		# File to store all results.
-		self.full_results_file = f"{self.output_dir}Results_OOD_set_{self.version}.csv"
-		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.version}.csv"
+		self.full_results_file = f"{self.output_dir}Results_OOD_set_{self.data_version}.csv"
+		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.data_version}.csv"
+		self.peds_results_file = f"{self.output_dir}Results_PEDS.csv"
 		
 		# Files for the plots and raw data.
-		self.af_conf_pred_counts_file = f"{self.output_dir}Confident_AF_preds_{self.version}.txt"
-		self.af_confidence_file = f"{self.output_dir}AF_confidence_plot_{self.version}"
-		self.af_confidence_scores = f"{self.output_dir}AF_confidence_scores_{self.version}.csv"
-		self.sparsity_file = f"{self.output_dir}Sparsity_F1_plot_{self.version}"
-		self.case_specific_analysis_file = f"{self.output_dir}Case_sp_analysis_{self.version}"
-		self.top_preds_diso_af2_file = f"{self.output_dir}Top_preds_Diso_AF2_{self.version}"
-		self.top_preds_file = f"{self.output_dir}Top_preds_{self.version}"
+		self.af_conf_pred_counts_file = f"{self.output_dir}Confident_AF_preds_{self.data_version}.txt"
+		self.af_confidence_file = f"{self.output_dir}AF_confidence_plot_{self.data_version}"
+		self.af_confidence_scores = f"{self.output_dir}AF_confidence_scores_{self.data_version}.csv"
+		self.sparsity_file = f"{self.output_dir}Sparsity_F1_plot_{self.data_version}"
+		self.case_specific_analysis_file = f"{self.output_dir}Case_sp_analysis_{self.data_version}"
+		self.top_preds_diso_af2_file = f"{self.output_dir}Top_preds_Diso_AF2_{self.data_version}"
+		self.top_preds_file = f"{self.output_dir}Top_preds_{self.data_version}"
 
 
 	def seed_worker( self ):
@@ -80,10 +87,14 @@ class JudgementDay():
 		self.af3_preds = np.load( self.af3_preds, allow_pickle = True ).item()
 		self.disobind_preds = np.load( self.disobind_preds, allow_pickle = True ).item()
 		self.target_cmap = h5py.File( self.target_cmap, "r" )
+		self.peds_preds = np.load( self.peds_preds, allow_pickle = True ).item()
+		self.target_peds = h5py.File( self.target_peds, "r" )
 		self.fraction_positives = json.load( open( self.fraction_positives, "r" ) )
 
 		self.count_confident_AF_predictions()
 		self.eval_performance()
+		self.eval_peds_performance()
+		# self.eval_single()
 
 
 	def get_tasks( self ):
@@ -184,9 +195,9 @@ class JudgementDay():
 				target = np.array( self.target_cmap[key1] )
 				target = self.prepare_target( target, task )
 
-				# Ignoring this entry, as AF2-multimer crashed for this.
-				if key1 == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
-					continue
+				# Ignoring this entry, as AF2-multimer crashed for this  (v_19 dataset).
+				# if key1 == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+					# continue
 
 				u1, u2 = key1.split( "--" )
 				u1 = u1.split( ":" )[0]
@@ -194,11 +205,11 @@ class JudgementDay():
 				u2 = u2.split( ":" )[0]
 
 				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
-				# 	Ignoring these from evaluation.
-				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
-										"O85041--O85043_0", "P25024--P10145_0"]:
-					continue
+				# 	Ignoring these from evaluation (v_19 dataset).
+				# if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
+				# 						"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
+				# 						"O85041--O85043_0", "P25024--P10145_0"]:
+				# 	continue
 
 				entry_ids.append( key1 )
 
@@ -340,8 +351,122 @@ class JudgementDay():
 					subset_dict[key].append( results_dict[key][i] )
 
 		df = pd.DataFrame( subset_dict )
-		df.to_csv( self.subset_results_file )
+		df.to_csv( self.subset_results_file, index = False )
 
+
+	def eval_peds_performance( self ):
+		"""
+		Calculate metric for performance on PEDS daatset.
+		"""
+		print( "Evaluation for PEDS..." )
+		peds_results_dict = {key:[] for key in ["Objective", "CG", "Recall",
+												"Precision", "F1-score"]}
+		for task in self.get_tasks():
+			print( f"Task {task}..." )
+			preds, targets = [], []
+
+			for entry_id in self.peds_preds:
+				target = self.target_peds[entry_id]
+				target = np.array( self.target_peds[entry_id] )
+				target = self.prepare_target( target, task )
+
+				# PEDS predictions have the same organization as the OOD set predictions.
+				preds.append( np.array( self.peds_preds[entry_id][task]["Disobind_uncal"] ) )
+				targets.append( target )
+
+			preds = torch.from_numpy( np.stack( preds ) )
+			targets = torch.from_numpy( np.stack( targets ) )
+
+			obj, cg = task.split( "_" )
+
+			metrics = self.calculate_metrics( pred = preds.to( self.device ),
+												target = targets.to( self.device ),
+												multidim_avg = "global" )
+
+			peds_results_dict["Objective"].append( obj.title() )
+			peds_results_dict["CG"].append( cg )
+			peds_results_dict["Recall"].append( metrics[0] )
+			peds_results_dict["Precision"].append( metrics[1] )
+			peds_results_dict["F1-score"].append( metrics[2] )
+
+		df = pd.DataFrame( peds_results_dict )
+		df.to_csv( self.peds_results_file, index = False )
+
+
+	def eval_single( self ):
+		"""
+		Calculate metric for performance for a specific model.
+		"""
+		print( "Evaluation for PEDS..." )
+		results_dict = {key:[] for key in ["Objective", "CG", "Recall",
+												"Precision", "F1-score"]}
+		for task in self.get_tasks():
+			print( f"Task {task}..." )
+			preds, targets = [], []
+
+			for entry_id in self.target_cmap:
+				# Ignoring this entry, as AF2-multimer crashed for this.
+				if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+					continue
+
+				u1, u2 = entry_id.split( "--" )
+				u1 = u1.split( ":" )[0]
+				u2, c = u2.split( "_" )
+				u2 = u2.split( ":" )[0]
+
+				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
+				# 	Ignoring these from evaluation (v_19 dataset).
+				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
+										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
+										"O85041--O85043_0", "P25024--P10145_0"]:
+					continue
+
+				# v_19 OOD not in v_221 and v_23 train.
+				if entry_id not in ['Q9UIF9:597:650--Q9UIF9:544:596_0', 'P84092:144:219--Q0JRZ9:318:341_0', 'P07101:128:184--P07101:128:184_6',
+							'Q9NPI8:162:215--Q00597:119:177_0', 'P43405:71:134--P43405:204:269_9', 'P25685:199:221--Q9Y266:102:128_0',
+							'Q96RI1:258:314--Q96RI1:258:314_0', 'Q9Y618:2334:2354--P37231:299:367_0', 'P07101:109:160--P07101:109:160_1',
+							'Q8WUM0:1089:1156--Q8WUM0:546:613_1', 'P53041:85:151--P08238:640:692_0', 'P0AFD6:1:90--P33602:680:735_4',
+							'P49789:61:147--P49789:55:108_1', 'Q99ZW2:1034:1088--P68398:77:160_0', 'P0AG30:315:366--P0AG30:315:366_14',
+							'P84092:68:135--P63010:513:584_21', 'Q16236:506:559--O15525:23:122_0', 'Q8AVI7:3:74--Q6GP41:2:79_0',
+							'B7UM94:22:106--B7UM94:22:106_4', 'P04273:95:193--P04273:95:193_0', 'P37840:69:97--P37840:38:67_9',
+							'P03317:2007:2069--P03317:2431:2505_4', 'Q02199:371:470--P48837:502:540_4', 'A0A5F9CI80:2:74--G1STG2:65:139_0',
+							'Q07666:143:201--Q07666:143:201_0', 'P01861:118:146--P55899:93:158_1', 'Q92800:80:164--O75530:77:167_0']:
+					continue
+
+				# # v_21 OOD not in v_23 train.
+				# if entry_id not in ['P37840:69:97--P37840:38:67_5', 'Q96EP0:966:1070--Q96EP0:867:959_3', 'P49366:8:185--P49366:10:78_0',
+				# 				'P25685:199:221--Q9Y266:102:128_0', 'P51946:1:38--P51948:244:308_0', 'P84092:144:219--Q0JRZ9:318:341_0',
+				# 				'B7UM94:19:192--B7UM94:19:192_0', 'Q92800:80:164--O75530:77:258_0', 'P55011:216:250--P55011:1022:1212_2',
+				# 				'P03317:2007:2069--P03317:2358:2505_2', 'P04273:95:193--P04273:95:193_0', 'P37231:231:367--Q9Y618:2334:2354_0',
+				# 				'P28307:41:151--P28307:41:151_0', 'Q9HBM1:80:224--Q8NBT2:86:197_0', 'Q16543:102:137--A0A7E5VSK5:267:371_1',
+				# 				'P56211:86:112--P63151:8:60_0', 'P06179:1:39--Q9R016:773:898_2', 'A0A6H1PJZ3:263:441--A0A6H1PJZ3:854:1000_4']:
+				# 	continue
+
+				target = self.target_cmap[entry_id]
+				target = np.array( self.target_cmap[entry_id] )
+				target = self.prepare_target( target, task )
+
+				# PEDS predictions have the same organization as the OOD set predictions.
+				preds.append( np.array( self.disobind_preds[entry_id][task]["Disobind_uncal"] ) )
+				targets.append( target )
+
+			preds = torch.from_numpy( np.stack( preds ) )
+			targets = torch.from_numpy( np.stack( targets ) )
+
+			obj, cg = task.split( "_" )
+
+			metrics = self.calculate_metrics( pred = preds.to( self.device ),
+												target = targets.to( self.device ),
+												multidim_avg = "global" )
+
+			results_dict["Objective"].append( obj.title() )
+			results_dict["CG"].append( cg )
+			results_dict["Recall"].append( metrics[0] )
+			results_dict["Precision"].append( metrics[1] )
+			results_dict["F1-score"].append( metrics[2] )
+
+		df = pd.DataFrame( results_dict )
+		df.to_csv( f"{self.output_dir}Results_Disobind_only.csv", index = False )
 
 
 	def count_confident_AF_predictions( self ):

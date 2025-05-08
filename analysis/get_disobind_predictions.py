@@ -36,6 +36,7 @@ In case no Uniprot ID is available for a protein, use the fasta file format.
 	Keep the header as: >Prot1:start1:end1.
 	Provide full protein sequence.
 """
+MAX_LEN_DICT = {19: 100, 21: 200, 23: 250}
 
 class Prediction():
 	def __init__( self ):
@@ -44,23 +45,24 @@ class Prediction():
 		"""
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
-		# Dataset version,or ood mode.
-		self.version = 21
+		# Dataset version.
+		self.data_version = 21
+		self.model_version = 21
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
 		self.scope = "global"
 		self.device = "cuda" # cpu/cuda.
 		# Max protein length.
-		self.max_len = 200
+		self.max_len = MAX_LEN_DICT[self.model_version]
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
-		self.mode = "peds"
+		self.mode = "OOD"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
-		self.parameters = parameter_files()
+		self.parameters = parameter_files( self.model_version )
 		# Dict to store predictions for all tasks.
 		self.predictions = {}
 		self.counts = [[], [], []]
@@ -78,15 +80,15 @@ class Prediction():
 		# self.output_dir = f"Predictions_{self.mod}_{self.mod_ver}"
 		# Name for output directory.
 		if self.mode == "ood":
-			self.output_dir = f"Predictions_ood_v{self.version}"
+			self.output_dir = f"Predictions_ood_v{self.data_version}"
 			# Filename to store predictions.
 			self.output_filename = "Disobind_Predictions.npy"
 			# Input file containing the prot1/2 headers.
-			self.input_file = f"../database/v_{self.version}/prot_1-2_test_v_{self.version}.csv"
+			self.input_file = f"../database/v_{self.data_version}/prot_1-2_test_v_{self.data_version}.csv"
 			# Uniprot file name.
-			self.Uniprot_seq_file =  f"../database/v_{self.version}/Uniprot_seq.json"
+			self.Uniprot_seq_file =  f"../database/v_{self.data_version}/Uniprot_seq.json"
 			# Test contact maps file name.
-			self.cmaps_file =  f"../database/v_{self.version}/Target_bcmap_test_v_{self.version}.h5"
+			self.cmaps_file =  f"../database/v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
 		elif self.mode == "peds":
 			self.output_dir = f"Predictions_peds/"
 			# Filename to store predictions.
