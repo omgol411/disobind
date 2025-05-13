@@ -31,12 +31,15 @@ class APedsTale():
         self.peds_pdb_details_dir = os.path.join( self.peds_dir, "pdb_api/" )
         self.peds_sifts_dir = os.path.join( self.peds_dir, "ped_sifts/" )
         self.peds_pdb_struct_dir = os.path.join( self.peds_dir, "ped_pdb_struct/" )
+        self.af2_fasta_dir = os.path.join( self.peds_dir, "AF2_fasta_peds/" )
+        self.af3_json_dir = os.path.join( self.peds_dir, "AF3_json_peds/" )
 
         self.valid_ped_entries_file = os.path.join( self.peds_dir, "valid_ped_entries.txt" )
         self.ped_pdbs_file = os.path.join( self.peds_dir, "ped_pdb_ids.txt" )
         self.peds_uni_seq_file = os.path.join( self.peds_dir, "Uniprot_seq_PEDS.json" )
         self.peds_test_input = os.path.join( self.peds_dir, "ped_test_input.csv" )
         self.peds_test_target = os.path.join( self.peds_dir, "ped_test_target.h5" )
+        self.af2_input_file = os.path.join( self.peds_dir, "AF2_peds_fasta_paths.txt" )
         
         if os.path.exists( self.peds_uni_seq_file ):
             with open( self.peds_uni_seq_file, "r" ) as f:
@@ -50,6 +53,8 @@ class APedsTale():
     def forward( self ):
         self.create_dir()
         peds_dict, peds_data = self.get_ped_entries()
+        self.create_af2_input( peds_data )
+        self.create_af3_input( peds_data )
         self.save( peds_dict, peds_data )
 
 
@@ -63,6 +68,8 @@ class APedsTale():
         os.makedirs( self.peds_pdb_details_dir, exist_ok = True )
         os.makedirs( self.peds_sifts_dir, exist_ok = True )
         os.makedirs( self.peds_pdb_struct_dir, exist_ok = True )
+        os.makedirs( self.af2_fasta_dir, exist_ok = True )
+        os.makedirs( self.af3_json_dir, exist_ok = True )
 
 
     def create_ped_ids( self ) -> List:
@@ -368,6 +375,20 @@ class APedsTale():
         return uni_id_pair
 
 
+    def get_prot_seq( self, entry_id: str ):
+        """
+        Get the required prot1/2 seq for the given entry.
+        """
+        uni_id1, uni_id2 = entry_id.split( "--" )
+        uni_id2, _ = uni_id2.split( "_" )
+        uni_id1, start1, end1 = uni_id1.split( ":" )
+        uni_id2, start2, end2 = uni_id2.split( ":" )
+
+        prot1_seq = self.uni_seq_dict[uni_id1][int( start1 )-1:int( end1 )]
+        prot2_seq = self.uni_seq_dict[uni_id2][int( start2 )-1:int( end2 )]
+        return prot1_seq, prot2_seq
+
+
     def get_ped_entries( self ):
         """
         Get data from PEDS API for all the valid PEDS IDs.
@@ -385,9 +406,10 @@ class APedsTale():
             PDB has non-protein chains too.
             No SIFTS mapping.
             Any chain in PDB exceed max length.
+            Mismatch in seq length and cmap dim.
         """
         peds_dict = {k:[] for k in ["valid_ped_entries", "pdb_ids"]}
-        peds_data = {"entry_id": [], "cmap": {}}
+        peds_data = {"entry_id": [], "cmap": {}, "seq": {}, "pdb": {}}
         ped_ids = self.get_ped_ids()
 
         for i, num_id in enumerate( ped_ids ):
@@ -421,50 +443,154 @@ class APedsTale():
 
             print( f"Here exists a complex entry {num_id}..." )
             pdb_id = self.get_pdb_ids_from_entry( data )
+            # No PDB entry available.
             if pdb_id == "":
                 continue
 
-            if pdb_id not in peds_dict["pdb_ids"]:
-                df = self.get_data_from_pdb_api( pdb_id )
-                # Should have 2 or more protein chains.
-                if df.shape[0] > 1:
-                    chain_uni_map = self.get_chain_uniprot_mapping( df )
+            # if pdb_id in peds_dict["pdb_ids"]:
+            #     continue
 
-                    success, mapping = self.get_pdb_uni_mapping( pdb_id )
-                    if not success:
-                        continue
-                    chain_uni_map, max_len_exceed = self.get_uniprot_feats( mapping, chain_uni_map )
+            # Redundant with training set and multiple insulin struct.
+            # if pdb_id in ["2bn5", "2mh3", "5nwm", "6b7g"] + ["1jco", "2mvd", "2rn5"]:
+            #     continue
 
-                    if max_len_exceed:
-                        print( f"{num_id} -> {pdb_id} exceds max length..." )
-                        continue
+            # Cherry-picked entries.
+            # if pdb_id not in ["1hui", "2dt7"."2jwn", "2n9p", "5tmx", "2mkr", "2mps", "2n3a"]:
+            if pdb_id not in ["2dt7", "2jwn", "2n3a"]:
+                continue
 
-                    struct_success = self.download_pdb_struct( pdb_id )
-                    if not struct_success:
-                        continue
+            print( f"-----------------> {pdb_id}" )
+            df = self.get_data_from_pdb_api( pdb_id )
+            # Should have 2 or more protein chains.
+            if df.shape[0] > 1:
+                chain_uni_map = self.get_chain_uniprot_mapping( df )
 
-                    seq_success = self.download_uniprot_seq( chain_uni_map )
-                    if not seq_success:
-                        continue
+                success, mapping = self.get_pdb_uni_mapping( pdb_id )
+                if not success:
+                    continue
+                chain_uni_map, max_len_exceed = self.get_uniprot_feats( mapping, chain_uni_map )
 
-                    contact_map = self.create_contact_maps( pdb_id, chain_uni_map )
+                if max_len_exceed:
+                    print( f"{num_id} -> {pdb_id} exceds max length..." )
+                    continue
 
-                    success_size = self.check_seq_cmap_size( chain_uni_map, contact_map )
-                    if not success_size:
-                        continue
+                struct_success = self.download_pdb_struct( pdb_id )
+                if not struct_success:
+                    continue
 
-                    # if np.count_nonzero( contact_map ) == 0:
-                    #     print( f"No contacts present at 8Angstorm in PDB: {pdb_id}..." )
-                    #     continue
-                    uni_id_pair = self.create_uni_id_pairs( chain_uni_map )
-                    peds_data["entry_id"].append( uni_id_pair )
-                    peds_data["cmap"][uni_id_pair] = contact_map
-                    peds_dict["pdb_ids"].append( pdb_id )
+                seq_success = self.download_uniprot_seq( chain_uni_map )
+                if not seq_success:
+                    continue
+
+                contact_map = self.create_contact_maps( pdb_id, chain_uni_map )
+
+                success_size = self.check_seq_cmap_size( chain_uni_map, contact_map )
+                if not success_size:
+                    continue
+
+                # if np.count_nonzero( contact_map ) == 0:
+                #     print( f"No contacts present at 8Angstorm in PDB: {pdb_id}..." )
+                #     continue
+                uni_id_pair = self.create_uni_id_pairs( chain_uni_map )
+                prot1_seq, prot2_seq = self.get_prot_seq( uni_id_pair )
+                peds_data["entry_id"].append( uni_id_pair )
+                peds_data["cmap"][uni_id_pair] = contact_map
+                peds_data["seq"][uni_id_pair] = [prot1_seq, prot2_seq]
+                peds_data["pdb"][uni_id_pair] = pdb_id
+                peds_dict["pdb_ids"].append( pdb_id )
 
         print( "Total valid PED entries found: ", len( peds_dict["valid_ped_entries"] ) )
         print( "Total PDB IDs obtained from PEDS: ", len( peds_dict["pdb_ids"] ) )
 
         return peds_dict, peds_data
+
+
+    def create_af2_input( self, peds_data:Dict ):
+        """
+        Create a directory containng fasta files to be used as input by AF2.
+            Each file contains Uniprot seq for the protein pairs with 
+                the respective Uniprot IDs as header.
+            e.g. "{entry}.fasta" 
+                >"{Uni_ID1}:start:end"
+                Sequence for prot1
+
+                >"{Uni_ID2}:start:end"
+                Sequence for prot2
+            start, end refer to the the first and last residue positions.
+        Also dump the paths to all FASTA files in a comma-separated txt file 
+            for ease of running AF2.
+        """
+        if not os.path.exists( self.af2_fasta_dir ): 
+            os.makedirs( f"{self.af2_fasta_dir}" )
+
+        w_path =  open( self.af2_input_file, "w" )
+        with open( self.af2_input_file, "w" ) as w:
+            for entry_id in peds_data["seq"].keys():
+                prot1_seq, prot2_seq = peds_data["seq"][entry_id]
+
+                uni_id1, uni_id2 = entry_id.split( "--" )
+                uni_id2, copy_num = uni_id2.split( "_" )
+                uni_id1, s1, e1 = uni_id1.split( ":" )
+                uni_id2, s2, e2 = uni_id2.split( ":" )
+
+                entry_id = f"{uni_id1}--{uni_id2}_{copy_num}"
+
+                with open( f"{self.af2_fasta_dir}{entry_id}.fasta", "w" ) as w:
+                    w.writelines( ">" + f"{uni_id1}:{s1}:{e1}" + "\n" + prot1_seq + "\n\n" )
+                    w.writelines( ">" + f"{uni_id2}:{s2}:{e2}" + "\n" + prot2_seq + "\n" )
+
+                w_path.writelines( f"./AF2_fasta_peds/{entry_id}.fasta," )
+        w_path.close()
+
+
+    def create_af3_input( self, peds_data: Dict ):
+        """
+        Create JSON file for batch running AF3 server.
+        Will create batches of 20 merged binary complexes.
+        AF3 requires a list of dict in JSON format 
+                (https://github.com/google-deepmind/alphafold/blob/main/server/README.md).
+        The entry_id serves as the job name.
+        This allows to upload 20 jobs on the AF3 server at once,
+                but you still need to run each job one by one.
+        """
+        peds_entry_ids = list( peds_data["seq"].keys() )
+        for start in np.arange( 0, len( peds_entry_ids ), 30 ):
+            if ( start + 30 ) > len( peds_entry_ids ):
+                end = len( peds_entry_ids )
+            else:
+                end = start + 30
+            af3_batch = []
+            for entry_id in peds_entry_ids[start:end]:
+                prot1_seq, prot2_seq = peds_data["seq"][entry_id]
+
+                uni_id1, uni_id2 = entry_id.split( "--" )
+                uni_id2, copy_num = uni_id2.split( "_" )
+                uni_id1, s1, e1 = uni_id1.split( ":" )
+                uni_id2, s2, e2 = uni_id2.split( ":" )
+
+                entry_id = f"{uni_id1}--{uni_id2}_{copy_num}"
+
+                af3_entry = {}
+                af3_entry["name"] = entry_id
+                af3_entry["modelSeeds"] = [1]
+                af3_entry["sequences"] = [
+                                    {
+                                    "proteinChain": {
+                                            "sequence": prot1_seq,
+                                            "count": 1
+                                    } },
+                                    {
+                                    "proteinChain": {
+                                            "sequence": prot2_seq,
+                                            "count": 1
+                                    } }
+                ]
+
+                af3_batch.append( af3_entry )
+
+            # Save batches of 20 merged binary complexes.
+            with open( f"{self.af3_json_dir}Batch_{start}-{end}.json", "w" ) as w:
+                json.dump( af3_batch, w )
 
 
     def save( self, peds_dict: Dict, peds_data: Dict ):
@@ -484,7 +610,10 @@ class APedsTale():
 
         hf = h5py.File( self.peds_test_target, "w" )
         for k in peds_data["cmap"]:
-            print( k, " --> ", peds_data["cmap"][k].shape )
+            print( k, " --> ", peds_data["pdb"][k], "  ",
+                    peds_data["cmap"][k].shape, "  ",
+                    np.count_nonzero( peds_data["cmap"][k] ), "  ",
+                    round( np.count_nonzero( peds_data["cmap"][k] )/peds_data["cmap"][k].size, 3 ) )
             hf.create_dataset( k, data = peds_data["cmap"][k] )
 
 
