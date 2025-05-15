@@ -161,7 +161,7 @@ class APedsTale():
         """
         if os.path.exists( self.valid_ped_entries_file ):
             with open( self.valid_ped_entries_file, "r" ) as f:
-                ped_ids = f.readlines()[0].split( "," )[:-1]
+                ped_ids = f.readlines()[0].( "," )[:-1]
         else:
             ped_ids = self.create_ped_ids()
         return ped_ids

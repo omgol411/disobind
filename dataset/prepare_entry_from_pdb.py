@@ -319,7 +319,7 @@ class TereNaam():
 
         uni_id_pair = f"{uni_id1}:{res1[0]}:{res1[1]}--{uni_id2}:{res2[0]}:{res2[1]}_0"
 
-        print( uni_id_pair )
+        print( f"Entry ID: {uni_id_pair}" )
         return uni_id_pair
 
 
@@ -353,10 +353,10 @@ class TereNaam():
 
         # PDB IDs from PEDS + SV's gold mine
         from_peds = ["2jwn", "2dt7", "2n3a", "2jss", "2mkr"]
-        from_SVs_gold_mine = ["1dt7", "2ruk", "2lmq", "8cmk", "2mwy", "2kqs"]
+        from_SVs_gold_mine = ["1dt7", "2ruk", "2lmq", "8cmk", "2mwy", "2kqs", "5xv8"]
         from_prev = ["7lna", "6xmn"]
         for i, pdb_id in enumerate( from_peds + from_SVs_gold_mine + from_prev ):
-        # for i, pdb_id in enumerate( ["2kqs"] ):
+        # for i, pdb_id in enumerate( ["5xv8"] ):
             print( f"\n-----------------> {pdb_id}" )
 
             df = self.get_data_from_pdb_api( pdb_id )
@@ -367,8 +367,6 @@ class TereNaam():
                 continue
 
             chain_uni_map = self.get_chain_uniprot_mapping( pdb_id, df )
-
-            print( chain_uni_map.keys() )
 
             if self.too_many_chains( chain_uni_map ):
                 print( "Too many chains..." )
