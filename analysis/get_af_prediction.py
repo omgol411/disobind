@@ -44,20 +44,36 @@ class AF2MPredictions():
 		self.coarse_grain_sizes = [1, 5, 10]
 		self.device = "cuda"
 		# AF2 or AF3.
-		self.af_model = "AF2"
-		
-		if self.af_model == "AF2":
-			# Dir containing AF2M predictions.
-			self.af_test_pred_dir = "AF2_preds"
+		self.af_model = "AF3"
+		# OOD/PEDS predictions
+		self.mode = "peds" # "ood" or "peds"
+
+		# if self.af_model == "AF2":
+		# 	# Dir containing AF2M predictions.
+		# 	self.af_test_pred_dir = "AF2_preds"
+		# else:
+		# 	# Dir containing AF3 predictions.
+		# 	self.af_test_pred_dir = "AF3_preds"
+
+		if self.mode == "ood":
+			# Dir containing AF2/3 predictions.
+			self.af_test_pred_dir = f"{self.af_model}_preds"
+			# OOD set target contact maps.
+			self.cmap = h5py.File( f"{self.base_path}Target_bcmap_test_v_{self.version}.h5", "r" )		
+			# File to store AF2/3 derived contact maps for OOD set.
+			self.af_pred_dir = f"./AF_preds_v{self.version}/"
+
+		elif self.mode == "peds":
+			# Dir containing AF2/3 predictions.
+			self.af_test_pred_dir = f"{self.af_model}_peds_preds"
+			# OOD set target contact maps.
+			self.cmap = h5py.File( f"../database/PEDS/ped_test_target.h5", "r" )
+			# File to store AF2/3 derived contact maps for OOD set.
+			self.af_pred_dir = f"./AF_peds_preds_v{self.version}/"
 
 		else:
-			# Dir containing AF3 predictions.
-			self.af_test_pred_dir = "AF3_preds"
+			raise ValueError( "Incorrect mode specified (ood/peds supported)..." )
 
-		# OOD set target contact maps.
-		self.cmap = h5py.File( f"{self.base_path}Target_bcmap_test_v_{self.version}.h5", "r" )		
-		# File to store AF2/3 derived contact maps for OOD set.
-		self.af_pred_dir = f"./AF_preds_v{self.version}/"
 		# Dict to store prediction results.
 		self.predictions = {}
 

@@ -58,7 +58,7 @@ class Prediction():
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
-		self.mode = "OOD"
+		self.mode = "misc"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
@@ -80,7 +80,7 @@ class Prediction():
 		# self.output_dir = f"Predictions_{self.mod}_{self.mod_ver}"
 		# Name for output directory.
 		if self.mode == "ood":
-			self.output_dir = f"Predictions_ood_v{self.data_version}"
+			self.output_dir = f"Predictions_ood_v_{self.data_version}"
 			# Filename to store predictions.
 			self.output_filename = "Disobind_Predictions.npy"
 			# Input file containing the prot1/2 headers.
@@ -90,7 +90,7 @@ class Prediction():
 			# Test contact maps file name.
 			self.cmaps_file =  f"../database/v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
 		elif self.mode == "peds":
-			self.output_dir = f"Predictions_peds/"
+			self.output_dir = f"Predictions_peds_v_{self.data_version}/"
 			# Filename to store predictions.
 			self.output_filename = "Disobind_Predictions_peds.npy"
 			# Input file containing the prot1/2 headers.
@@ -99,6 +99,16 @@ class Prediction():
 			self.Uniprot_seq_file =  f"../database/PEDS/Uniprot_seq_PEDS.json"
 			# Test contact maps file name.
 			self.cmaps_file =  f"../database/PEDS/ped_test_target.h5"
+		elif self.mode == "misc":
+			self.output_dir = f"Predictions_misc_v_{self.data_version}/"
+			# Filename to store predictions.
+			self.output_filename = "Disobind_Predictions_misc.npy"
+			# Input file containing the prot1/2 headers.
+			self.input_file = f"../database/Misc/misc_test_input.csv"
+			# Uniprot file name.
+			self.Uniprot_seq_file =  f"../database/Misc/Uniprot_seq_misc.json"
+			# Test contact maps file name.
+			self.cmaps_file =  f"../database/Misc/misc_test_target.h5"
 		else:
 			raise ValueError( "Incorrect mode specified (ood/peds supported)..." )
 
@@ -108,7 +118,7 @@ class Prediction():
 				exit()
 		else:
 			os.makedirs( self.output_dir, exist_ok = True )
-		
+
 		# Absolute path to the analysis dir.
 		self.abs_path = os.path.abspath( "./" )
 		# Path fo the FASTA file for prot1/2 sequences.
