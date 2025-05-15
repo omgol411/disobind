@@ -22,7 +22,7 @@ class JudgementDay():
 		self.data_version = 21
 		self.model_version = 21
 		# path for the dataset dir.
-		self.base_path = f"../database/"
+		self.base_path = f"../database/v_{self.data_version}/"
 		# Seed for the PRNGs.
 		self.global_seed = 11
 		# Cutoff to dfine contact for disobind predictions.
@@ -32,32 +32,63 @@ class JudgementDay():
 		# Max prot1/2 lengths.
 		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
+		self.mode = "ood" # "ood" or "peds" or "misc"
+
 		self.device = "cuda"
 
-		# AF2 predictions file.
-		self.af2m_preds = f"./AF_preds_v{self.data_version}/Predictions_af2m_results_{self.iptm_cutoff}.npy"
-		# AF3 predictions file.
-		self.af3_preds = f"./AF_preds_v{self.data_version}/Predictions_af3_results_{self.iptm_cutoff}.npy"
-		# Disobind predictions file.
-		self.disobind_preds = f"./Predictions_ood_v{self.data_version}/Disobind_Predictions.npy"
+		if self.mode == "ood":
+			self.base_af_dir = f"./AF_preds_v{self.data_version}/"
+			self.diso_base_dir = f"./Predictions_{self.mode}_v_{self.data_version}/"
+			# OOD set target contact maps file.
+			self.target_cmap = f"{self.base_path}Target_bcmap_test_v_{self.data_version}.h5"
+			# Disobind predictions file.
+			self.disobind_preds = f"{self.diso_base_dir}Disobind_Predictions.npy"
 
-		# OOD set target contact maps file.
-		self.target_cmap = f"{self.base_path}v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
+		elif self.mode == "peds":
+			self.base_af_dir = f"./AF_peds_preds_v{self.data_version}/"
+			self.diso_base_dir = f"./Predictions_{self.mode}_v_{self.data_version}/"
+			# OOD set target contact maps file.
+			self.target_cmap = f"{self.base_path}PEDS/ped_test_target.h5"
+			# Disobind predictions file.
+			self.disobind_preds = f"{self.diso_base_dir}Disobind_Predictions_peds.npy"
+
+		elif self.mode == "misc":
+			self.base_af_dir = f"./AF_misc_preds_v{self.data_version}/"
+			self.diso_base_dir = f"./Predictions_{self.mode}_v_{self.data_version}/"
+			# OOD set target contact maps file.
+			self.target_cmap = f"{self.base_path}Misc/misc_test_target.h5"
+			# Disobind predictions file.
+			self.disobind_preds = f"{self.diso_base_dir}Disobind_Predictions_misc.npy"
+
+		else:
+			raise ValueError( "Incorrect mode specified (ood/peds/misc supported)..." )
+
+		# AF2 predictions file.
+		self.af2m_preds = f"{self.base_af_dir}Predictions_af2m_results_{self.iptm_cutoff}.npy"
+		# AF3 predictions file.
+		self.af3_preds = f"{self.base_af_dir}Predictions_af3_results_{self.iptm_cutoff}.npy"
+
+		# Predictions from AIUPred and DeepDisoBind
+		self.other_methods = "./other_methods/other_methods.npy"
+
+		# # OOD set target contact maps file.
+		# self.target_cmap = f"{self.diso_base_dir}/Target_bcmap_test_v_{self.data_version}.h5"
+		# self.target_cmap = f"{self.base_path}v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
 		# Fraction of positives in the dataset for all tasks.
-		self.fraction_positives = f"{self.base_path}v_{self.data_version}/T5/global-None/fraction_positives.json"
+		self.fraction_positives = f"{self.base_path}T5/global-None/fraction_positives.json"
 		# File containing info about the merged binary complexes in the dataset.
 		self.merged_binary_complexes_dir = f"{self.base_path}v_{self.data_version}/merged_binary_complexes/"
 
-		# PEDS entries.
-		self.target_peds = f"{self.base_path}PEDS/ped_test_target.h5"
-		self.peds_preds = f"./Predictions_peds/Disobind_Predictions_peds.npy"
+		self.output_dir = f"./Analysis_{self.mode.upper()}_{self.data_version}_{self.iptm_cutoff}/"
 
-		self.output_dir = f"./Analysis_OOD_{self.data_version}_{self.iptm_cutoff}/"
+		# # PEDS entries.
+		# self.target_peds = f"{self.base_path}PEDS/ped_test_target.h5"
+		# self.peds_preds = f"./Predictions_peds_v_{self.data_version}/Disobind_Predictions_peds.npy"
 
 		# File to store all results.
 		self.full_results_file = f"{self.output_dir}Results_OOD_set_{self.data_version}.csv"
 		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.data_version}.csv"
-		self.peds_results_file = f"{self.output_dir}Results_PEDS.csv"
+		# self.peds_results_file = f"{self.output_dir}Results_PEDS.csv"
 		
 		# Files for the plots and raw data.
 		self.af_conf_pred_counts_file = f"{self.output_dir}Confident_AF_preds_{self.data_version}.txt"
@@ -87,13 +118,16 @@ class JudgementDay():
 		self.af3_preds = np.load( self.af3_preds, allow_pickle = True ).item()
 		self.disobind_preds = np.load( self.disobind_preds, allow_pickle = True ).item()
 		self.target_cmap = h5py.File( self.target_cmap, "r" )
-		self.peds_preds = np.load( self.peds_preds, allow_pickle = True ).item()
-		self.target_peds = h5py.File( self.target_peds, "r" )
+		other_methods = np.load( self.other_methods, allow_pickle = True ).item()
+		self.aiupred = other_methods["aiupred"]
+		self.deepdisobind = other_methods["deepdisobind"]
+		# self.peds_preds = np.load( self.peds_preds, allow_pickle = True ).item()
+		# self.target_peds = h5py.File( self.target_peds, "r" )
 		self.fraction_positives = json.load( open( self.fraction_positives, "r" ) )
 
 		self.count_confident_AF_predictions()
 		self.eval_performance()
-		self.eval_peds_performance()
+		# self.eval_peds_performance()
 		# self.eval_single()
 
 
@@ -180,14 +214,15 @@ class JudgementDay():
 		ood_dict --> (dict) containing Disobind, AF2, AF3 predictions, target masks, disorder matrices, 
 					and target cmaps for all OOD entries.
 		"""
-		# For all tasks.
+		# For all tasks.		for task in self.get_tasks():
+		
 		for task in self.get_tasks():
 			counts = [0, 0, 0]
 			# All fields to be included for the results.
 			ood_dict = {key:[] for key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
 											"Disobind_uncal", "Random_baseline", "masks", 
 											"disorder_mat1", "disorder_mat2", "order_mat",
-											"targets"]}
+											"Aiupred", "Deepdisobind", "targets"]}
 
 			# For all entries.
 			entry_ids = []
@@ -203,6 +238,31 @@ class JudgementDay():
 				u1 = u1.split( ":" )[0]
 				u2, c = u2.split( "_" )
 				u2 = u2.split( ":" )[0]
+
+				# # "2mps"
+				# if f"{u1}--{u2}_{c}" not in ["Q00987--O15350_0"]:
+				# 	continue
+				# # "2n3a"
+				# if f"{u1}--{u2}_{c}" not in ["Q7Z3K3--O75475_0"]:
+				# 	continue
+				# # "2mkr"
+				# if f"{u1}--{u2}_{c}" not in ["P32776--P12978_0"]:
+				# 	continue
+				# # "1hui"
+				# if f"{u1}--{u2}_{c}" not in ["P01308--P01308_0"]:
+				# 	continue
+				# # "5tmx"
+				# if f"{u1}--{u2}_{c}" not in ["P23308--P23308_0"]:
+				# 	continue
+				# # "2n0p"
+				# if f"{u1}--{u2}_{c}" not in ["Q9BV68--P46379_0"]:
+				# 	continue
+				# # "2dt7"
+				# if f"{u1}--{u2}_{c}" not in ["Q12874--Q15459_0"]:
+				# 	continue
+				# # 2jwn
+				# if f"{u1}--{u2}_{c}" not in ["Q6TY21--Q6TY21_0"]:
+				# 	continue
 
 				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
 				# 	Ignoring these from evaluation (v_19 dataset).
@@ -223,6 +283,20 @@ class JudgementDay():
 
 					elif "Disobind" in key2:
 						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
+
+					elif "Aiupred" in key2:
+						if task == "interface_1":
+							ood_dict[key2].append( self.aiupred[f"{u1}--{u2}_{c}"] )
+						else:
+							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
+							ood_dict[key2].append( np.zeros( dummy.shape ) )
+
+					elif "Deepdisobind" in key2:
+						if task == "interface_1":
+							ood_dict[key2].append( self.deepdisobind[f"{u1}--{u2}_{c}"] )
+						else:
+							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
+							ood_dict[key2].append( np.zeros( dummy.shape ) )
 
 					elif key2 in ["masks", "disorder_mat1", "disorder_mat2", "order_mat"]:
 						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
@@ -272,13 +346,11 @@ class JudgementDay():
 			af2_diso = np.stack( [ood_dict["AF2_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_uncal"].reshape( b, m*n )], axis = 1 )
 			af2_diso = np.max( af2_diso, axis = 1 ).reshape( b, m, n )
 			preds_dict["AF2_Disobind_uncal"] = torch.from_numpy( af2_diso )
-			
 
 			af3_diso = np.stack( [ood_dict["AF3_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_uncal"].reshape( b, m*n )], axis = 1 )
 			af3_diso = np.max( af3_diso, axis = 1 ).reshape( b, m, n )
 			preds_dict["AF3_Disobind_uncal"] = torch.from_numpy( af3_diso )
 
-			
 			# AF2/AF3 pLDDT+PAE corrected predictions for IDR-IDR and IDR-any interactions.
 			preds_dict["AF2_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
 			preds_dict["AF3_IDR-IDR"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
@@ -346,12 +418,134 @@ class JudgementDay():
 											"AF2_order", "AF3_order", "Disobind_uncal_order",
 											"AF2_Disobind_uncal_order",
 											"AF2_IDR-any", "AF3_IDR-any", "Disobind_uncal_IDR-any",
-											"AF2_Disobind_uncal_IDR-any", ""]:
+											"AF2_Disobind_uncal_IDR-any", "Aiupred", "Deepdisobind",
+											"Random_baseline", ""]:
 				for key in subset_dict.keys():
 					subset_dict[key].append( results_dict[key][i] )
 
 		df = pd.DataFrame( subset_dict )
 		df.to_csv( self.subset_results_file, index = False )
+
+
+
+	def create_performance_contactdensity_plots( self, entries, diso_preds, af2_preds, diso_af2_preds, target ):
+		"""
+		Create a plot for the performance(Recall/Precision/F1) vs contact density for Interface_1.
+		Save the raw data on disk.
+		Also save the top predictions (> 0.7 F1 score) on disk.
+
+		Input:
+		----------
+		entries --> list of all entry_id for all OOD entries.
+		diso_preds --> (torch.tensor) Calibrated Disobind prediction.
+		af2_preds --> (torch.tensor) AF2 predictions.
+		target --> (torch.tensor) binary output labels.
+
+		Returns:
+		----------
+		None
+		"""
+		entries = np.array( entries )
+
+		# Get per OOD entry metrics.
+		metrics_diso = torch_metrics( preds = diso_preds.to( self.device ), 
+								target = torch.from_numpy( target ).to( self.device ), 
+								threshold = self.contact_threshold,
+								multidim_avg = "samplewise_none", device = self.device )
+		
+
+		metrics_af2 = torch_metrics( preds = af2_preds.to( self.device ), 
+								target = torch.from_numpy( target ).to( self.device ), 
+								threshold = self.contact_threshold,
+								multidim_avg = "samplewise_none", device = self.device )
+
+		metrics_diso_af2 = torch_metrics( preds = diso_af2_preds.to( self.device ), 
+									target = torch.from_numpy( target ).to( self.device ), 
+									threshold = self.contact_threshold,
+									multidim_avg = "samplewise_none", device = self.device )
+		
+		contact_density = []
+		for i, id_ in enumerate( entries ):
+			head1, head2 = id_.split( "--" )
+			head2, num = head2.split( "_" )
+			uni_id1, r11, r12 = head1.split( ":" )
+			uni_id2, r21, r22 = head2.split( ":" )
+			len1 = int( r12 ) - int( r11 ) + 1
+			len2 = int( r22 ) - int( r21 ) + 1
+			
+			contacts = np.count_nonzero( target[i] )
+			num_elements = len1 + len2
+
+			contact_density.append( contacts/num_elements )
+
+		contact_density = np.array( contact_density ).reshape( len( entries ), 1 )
+
+		re_diso = metrics_diso[0].cpu().numpy()
+		prec_diso = metrics_diso[1].cpu().numpy()
+		f1_diso = metrics_diso[2].cpu().numpy()
+
+		re_af2 = metrics_af2[0].cpu().numpy()
+		prec_af2 = metrics_af2[1].cpu().numpy()
+		f1_af2 = metrics_af2[2].cpu().numpy()
+
+		re_diso_af2 = metrics_diso_af2[0].cpu().numpy()
+		prec_diso_af2 = metrics_diso_af2[1].cpu().numpy()
+		f1_diso_af2 = metrics_diso_af2[2].cpu().numpy()
+
+		fig, ax = plt.subplots( 1, 3, figsize = ( 20, 8 ) )
+		ax[0].scatter( contact_density, re_diso )
+		ax[0].set_ylabel( "Recall" )
+		ax[0].set_xlabel( "Contact density" )
+
+		ax[1].scatter( contact_density, prec_diso )
+		ax[1].set_ylabel( "Precision" )
+		ax[1].set_xlabel( "Contact density" )
+		
+		ax[2].scatter( contact_density, f1_diso )
+		ax[2].set_ylabel( "F1 score" )
+		ax[2].set_xlabel( "Contact density" )
+
+		plt.savefig( f"{self.contact_density_file}.png", dpi = 300 )
+		plt.close()
+
+		# Save samplewsie metrics for Disobind and AF2 on OOD set.
+		df = pd.DataFrame()
+		df["Entry ID"] = entries
+		df["Contact density"] = np.round( contact_density.reshape( -1 ), 3 )
+		df["Recall"] = np.round( list( re_diso ), 3 )
+		df["Precision"] = np.round( list( prec_diso ), 3 )
+		df["F1"] = np.round( list( f1_diso ), 3 )
+		df["AF2-Recall"] = np.round( list( re_af2 ), 3 )
+		df["AF2-Precision"] = np.round( list( prec_af2 ), 3 )
+		df["AF2-F1"] = np.round( list( f1_af2 ), 3 )
+		df["Diso+AF2-Recall"] = np.round( list( re_diso_af2 ), 3 )
+		df["Diso+AF2-Precision"] = np.round( list( prec_diso_af2 ), 3 )
+		df["Diso+AF2-F1"] = np.round( list( f1_diso_af2 ), 3 )
+		df.to_csv( f"{self.contact_density_file}.csv" )
+
+		# Save samplewsie metrics for Disobind and AF2 on best performing pairs.
+		idx = np.where( f1_diso_af2 > 0.7 )
+		top = entries[idx]
+
+		df = pd.DataFrame()
+		df["Entry ID"] = top
+		df["Contact density"] = np.round( contact_density[idx], 3 )
+		df["Recall"] = np.round( re_diso[idx], 3 )
+		df["Precision"] = np.round( prec_diso[idx], 3 )
+		df["F1 score"] = np.round( f1_diso[idx], 3 )
+		df["AF2-Recall"] = np.round( re_af2[idx], 3 )
+		df["AF2-Precision"] = np.round( prec_af2[idx], 3 )
+		df["AF2-F1 score"] = np.round( f1_af2[idx], 3 )
+		df["Diso+AF2-Recall"] = np.round( list( re_diso_af2[idx] ), 3 )
+		df["Diso+AF2-Precision"] = np.round( list( prec_diso_af2[idx] ), 3 )
+		df["Diso+AF2-F1"] = np.round( list( f1_diso_af2[idx] ), 3 )
+		df.to_csv( f"{self.top_preds_file}.csv" )
+
+		plt.scatter( f1_diso[idx], f1_af2[idx], color = "blue" )
+		plt.xlim( 0.5, 1 )
+		plt.ylim( -0.1, 1 )
+		plt.savefig( f"{self.top_preds_diso_af2_file}.png", dpi = 300 )
+		plt.close()
 
 
 	def eval_peds_performance( self ):
@@ -405,33 +599,33 @@ class JudgementDay():
 			preds, targets = [], []
 
 			for entry_id in self.target_cmap:
-				# Ignoring this entry, as AF2-multimer crashed for this.
-				if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
-					continue
+				# # Ignoring this entry, as AF2-multimer crashed for this.
+				# if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+				# 	continue
 
 				u1, u2 = entry_id.split( "--" )
 				u1 = u1.split( ":" )[0]
 				u2, c = u2.split( "_" )
 				u2 = u2.split( ":" )[0]
 
-				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
-				# 	Ignoring these from evaluation (v_19 dataset).
-				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
-										"O85041--O85043_0", "P25024--P10145_0"]:
-					continue
+				# # These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
+				# # 	Ignoring these from evaluation (v_19 dataset).
+				# if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
+				# 						"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
+				# 						"O85041--O85043_0", "P25024--P10145_0"]:
+				# 	continue
 
-				# v_19 OOD not in v_221 and v_23 train.
-				if entry_id not in ['Q9UIF9:597:650--Q9UIF9:544:596_0', 'P84092:144:219--Q0JRZ9:318:341_0', 'P07101:128:184--P07101:128:184_6',
-							'Q9NPI8:162:215--Q00597:119:177_0', 'P43405:71:134--P43405:204:269_9', 'P25685:199:221--Q9Y266:102:128_0',
-							'Q96RI1:258:314--Q96RI1:258:314_0', 'Q9Y618:2334:2354--P37231:299:367_0', 'P07101:109:160--P07101:109:160_1',
-							'Q8WUM0:1089:1156--Q8WUM0:546:613_1', 'P53041:85:151--P08238:640:692_0', 'P0AFD6:1:90--P33602:680:735_4',
-							'P49789:61:147--P49789:55:108_1', 'Q99ZW2:1034:1088--P68398:77:160_0', 'P0AG30:315:366--P0AG30:315:366_14',
-							'P84092:68:135--P63010:513:584_21', 'Q16236:506:559--O15525:23:122_0', 'Q8AVI7:3:74--Q6GP41:2:79_0',
-							'B7UM94:22:106--B7UM94:22:106_4', 'P04273:95:193--P04273:95:193_0', 'P37840:69:97--P37840:38:67_9',
-							'P03317:2007:2069--P03317:2431:2505_4', 'Q02199:371:470--P48837:502:540_4', 'A0A5F9CI80:2:74--G1STG2:65:139_0',
-							'Q07666:143:201--Q07666:143:201_0', 'P01861:118:146--P55899:93:158_1', 'Q92800:80:164--O75530:77:167_0']:
-					continue
+				# # v_19 OOD not in v_221 and v_23 train.
+				# if entry_id not in ['Q9UIF9:597:650--Q9UIF9:544:596_0', 'P84092:144:219--Q0JRZ9:318:341_0', 'P07101:128:184--P07101:128:184_6',
+				# 			'Q9NPI8:162:215--Q00597:119:177_0', 'P43405:71:134--P43405:204:269_9', 'P25685:199:221--Q9Y266:102:128_0',
+				# 			'Q96RI1:258:314--Q96RI1:258:314_0', 'Q9Y618:2334:2354--P37231:299:367_0', 'P07101:109:160--P07101:109:160_1',
+				# 			'Q8WUM0:1089:1156--Q8WUM0:546:613_1', 'P53041:85:151--P08238:640:692_0', 'P0AFD6:1:90--P33602:680:735_4',
+				# 			'P49789:61:147--P49789:55:108_1', 'Q99ZW2:1034:1088--P68398:77:160_0', 'P0AG30:315:366--P0AG30:315:366_14',
+				# 			'P84092:68:135--P63010:513:584_21', 'Q16236:506:559--O15525:23:122_0', 'Q8AVI7:3:74--Q6GP41:2:79_0',
+				# 			'B7UM94:22:106--B7UM94:22:106_4', 'P04273:95:193--P04273:95:193_0', 'P37840:69:97--P37840:38:67_9',
+				# 			'P03317:2007:2069--P03317:2431:2505_4', 'Q02199:371:470--P48837:502:540_4', 'A0A5F9CI80:2:74--G1STG2:65:139_0',
+				# 			'Q07666:143:201--Q07666:143:201_0', 'P01861:118:146--P55899:93:158_1', 'Q92800:80:164--O75530:77:167_0']:
+				# 	continue
 
 				# # v_21 OOD not in v_23 train.
 				# if entry_id not in ['P37840:69:97--P37840:38:67_5', 'Q96EP0:966:1070--Q96EP0:867:959_3', 'P49366:8:185--P49366:10:78_0',
@@ -442,6 +636,41 @@ class JudgementDay():
 				# 				'P56211:86:112--P63151:8:60_0', 'P06179:1:39--Q9R016:773:898_2', 'A0A6H1PJZ3:263:441--A0A6H1PJZ3:854:1000_4']:
 				# 	continue
 
+				# # "2n3a"
+				# if f"{u1}--{u2}_{c}" not in ["Q7Z3K3--O75475_0"]:
+				# 	continue
+				# # "2dt7"
+				# if f"{u1}--{u2}_{c}" not in ["Q12874--Q15459_0"]:
+				# 	continue
+				# # 2jwn
+				# if f"{u1}--{u2}_{c}" not in ["Q6TY21--Q6TY21_0"]:
+				# 	continue
+				# # 2mkr
+				# if f"{u1}--{u2}_{c}" not in ["P32776--P12978_0"]:
+				# 	continue
+
+				# # "2lmq"
+				# if f"{u1}--{u2}_{c}" not in ["P05067--P05067_0"]:
+				# 	continue
+				# # "8cmk"
+				# if f"{u1}--{u2}_{c}" not in ["Q9Y5L0--Q14011_0"]:
+				# 	continue
+				# # 2mwy
+				# if f"{u1}--{u2}_{c}" not in ["O15151--P04637_0"]:
+				# 	continue
+				# # 2kqs
+				# if f"{u1}--{u2}_{c}" not in ["P63165--Q9UER7_0"]:
+				# 	continue
+				# 5xv8
+				if f"{u1}--{u2}_{c}" not in ["Q2YD98--P32780_0"]:
+					continue
+
+				# # 7lna
+				# if f"{u1}--{u2}_{c}" not in ["P04273--P04273_0"]:
+				# 	continue
+				# # 6xmn
+				# if f"{u1}--{u2}_{c}" not in ["P10145--P25024_0"]:
+				# 	continue
 				target = self.target_cmap[entry_id]
 				target = np.array( self.target_cmap[entry_id] )
 				target = self.prepare_target( target, task )
