@@ -22,6 +22,7 @@ class CreateInput():
         self.uni_seq_file = os.path.join( self.base_dir, "v_21/Uniprot_seq.json" )
         self.deepdiso_fasta_file = os.path.join( self.meth_dir, "deepdisobind_fasta" )
         self.aiupred_input_file = os.path.join( self.meth_dir, "aiupred_input.json" )
+        self.morfchibi_fasta_file = os.path.join( self.meth_dir, "morfchibi_fasta.fasta" )
         # self.entry_ids_map_file = os.path.join( self.meth_dir, "entry_id_map.json" )
 
         # Dict to store all protein sequences in OOD set.
@@ -38,6 +39,7 @@ class CreateInput():
         self.get_seq_for_ood_entry( entry_ids )
         self.write_deepdiso_fasta_file()
         self.write_aiupred_input_file()
+        self.write_morfchibi_fasta_file()
 
         # with open( self.entry_ids_map_file, "w" ) as w:
         #     json.dump( self.old_to_new, w )
@@ -125,6 +127,21 @@ class CreateInput():
         """
         with open( self.aiupred_input_file, "w" ) as w:
             json.dump( self.ood_seq_dict, w )
+
+
+    def write_morfchibi_fasta_file( self ):
+        """
+        Create a FASTA file for input to MORFchibi web.
+        """
+        # all_ids = list( self.ood_seq_dict.keys() )
+        # for s in np.arange( 0, len( all_ids ), 20 ):
+        #     e = s+20 if s+20 < len( all_ids ) else len( all_ids )
+        with open( self.morfchibi_fasta_file, "w" ) as w:
+            for id_ in self.ood_seq_dict:
+                seq = self.ood_seq_dict[id_]["seq"]
+                w.writelines( f">{id_}\n" )
+                w.writelines( f"{seq}\n\n" )
+
 
 
 ################################################
