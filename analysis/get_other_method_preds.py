@@ -1,5 +1,5 @@
 """
-Obtain predictions from interface predictors - AIUPred and DeepDisoBind.
+Obtain predictions from interface predictors - AIUPred, DeepDisoBind, and MORFchibi.
 """
 import os,json
 from typing import Dict
@@ -10,13 +10,13 @@ import aiupred_lib
 
 class Othermethods():
 	"""
-	Parse the DeepDisoBind prediction results and arange
-		in Disobind output format.
-	Get AIUPred predictions for the OOD set
-		and arange in Disobind output format.
+	Parse the DeepDisoBind and MORFchibi prediction results.
+	Get AIUPred predictions for the OOD set.
+	Arange all in Disobind output format.
 	"""
 	def __init__( self ):
 		self.input_dir = "../database/other_methods"
+		self.morfchibi_results_dir = os.path.join( self.input_dir, "morf_chibi_results" )
 		self.output_dir = "./other_methods/"
 
 		self.max_len = 200
@@ -28,7 +28,7 @@ class Othermethods():
 
 		self.output_file = os.path.join( self.output_dir, "other_methods.npy" )
 
-		self.predictions = {k:{} for k in ["aiupred", "deepdisobind"]}
+		self.predictions = {k:{} for k in ["aiupred", "deepdisobind", "morfchibi"]}
 
 
 	def forward( self ):
@@ -37,7 +37,8 @@ class Othermethods():
 			self.aiupred_input = json.load( f )
 		aiupred_preds = self.get_aiupred_predictions()
 		deepdiso_preds = self.get_deepdisobind_predictions()
-		self.assemble_interfaces_for_ood_entries( aiupred_preds, deepdiso_preds )
+		morfchibi_preds = self.get_morfchibi_predictions()
+		self.assemble_interfaces_for_ood_entries( aiupred_preds, deepdiso_preds, morfchibi_preds )
 
 		np.save( self.output_file, self.predictions, allow_pickle = True )
 
@@ -117,6 +118,46 @@ class Othermethods():
 		return deepdiso_preds
 
 
+	def parse_morfchibi_output( self, file_path ):
+		"""
+		MORFchibi provides the output as a .txt file saved as tsv separated.
+		First 9 lines are just comments and header, so will ignore those.
+		MORFchibi does not provide any cutoff to convert the binding propensity
+			to binary intrefaces.
+			Will use 0.5.
+		"""
+		with open( file_path, "r" ) as f:
+			results = f.readlines()
+		preds = []
+		for line in results[9:]:
+			propensity = line.strip().split( "\t" )
+			propensity = float( propensity[-1] )
+			preds.append( propensity )
+		return np.array( preds )
+
+
+	def get_morfchibi_predictions( self ) -> Dict[str, np.array]:
+		"""
+		MORFchibi prediction obtained from - https://mc2.msl.ubc.ca/index.xhtml
+		Parse all MORFchibi predictions and binarize the binding propensity.
+		For some entries MORFchibi results couldn't be obtained due to the small
+			size of the fragment (MORFchibi min length = 26).
+		For these will just create an array of 0s for now.
+		"""
+		morfchibi_preds = {}
+		print( "\n--> Parsing MORFchibi predictions..." )
+		for seq_id in self.aiupred_input:
+			result_file = os.path.join( self.morfchibi_results_dir, f"_{seq_id}.txt" )
+			if os.path.exists( result_file ):
+				prediction = self.parse_morfchibi_output( result_file )
+			else:
+				start1, end1 = list( map( int, seq_id.split( "_" )[1:] ) )
+				prediction = np.zeros( [end1-start1+1] )
+			ood_entry_id = self.aiupred_input[seq_id]["ood_entry_id"]
+			morfchibi_preds[ood_entry_id] = {seq_id: prediction}
+		return morfchibi_preds
+
+
 	def pad_to_max_len( self, pred: np.array ) -> np.array:
 		"""
 		Add 0-padding to max_len.
@@ -127,7 +168,8 @@ class Othermethods():
 		return pad_mask
 
 
-	def assemble_interfaces_for_ood_entries( self, aiupred_preds: Dict, deepdiso_preds: Dict ):
+	def assemble_interfaces_for_ood_entries( self, aiupred_preds: Dict, deepdiso_preds: Dict,
+											morfchibi_preds: Dict ):
 		"""
 		Pair up the partner-independent interface predictions for all OOD entries.
 		"""
@@ -150,21 +192,30 @@ class Othermethods():
 
 					deepdiso_p1 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
 					deepdiso_p2 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
+
+					morfchibi_p1 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+					morfchibi_p2 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
 				# Heteromeric entries.
 				else:
 					if seq_uni_id == ood_uni_id1:
 						aiupred_p1 = self.pad_to_max_len( aiupred_preds[ood_entry_id][seq_id] )
 						deepdiso_p1 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
+						morfchibi_p1 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+
 					elif seq_uni_id == ood_uni_id2:
 						aiupred_p2 = self.pad_to_max_len( aiupred_preds[ood_entry_id][seq_id] )
 						deepdiso_p2 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
+						morfchibi_p2 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+
 					else:
 						raise ValueError( f"Uniprot ID from AIUPred/DeepDisoBind does not match OOD Uniprot ID..." )
 				aiupred_interface = np.hstack( [aiupred_p1, aiupred_p2] ).reshape( -1, 1 )
 				deepdiso_interface = np.hstack( [deepdiso_p1, deepdiso_p2] ).reshape( -1, 1 )
+				morfchibi_interface = np.hstack( [morfchibi_p1, morfchibi_p2] ).reshape( -1, 1 )
 
 				self.predictions["aiupred"][ood_entry_id] = aiupred_interface
 				self.predictions["deepdisobind"][ood_entry_id] = deepdiso_interface
+				self.predictions["morfchibi"][ood_entry_id] = morfchibi_interface
 				# self.predictions[ood_entry_id] = {"aiupred": aiupred_interface,
 				# 									"deepdiso": deepdiso_interface
 				# 									}

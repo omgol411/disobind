@@ -28,7 +28,7 @@ class JudgementDay():
 		# Cutoff to dfine contact for disobind predictions.
 		self.contact_threshold = 0.5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.0
+		self.iptm_cutoff = 0.75
 		# Max prot1/2 lengths.
 		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
@@ -121,6 +121,7 @@ class JudgementDay():
 		other_methods = np.load( self.other_methods, allow_pickle = True ).item()
 		self.aiupred = other_methods["aiupred"]
 		self.deepdisobind = other_methods["deepdisobind"]
+		self.morfchibi = other_methods["morfchibi"]
 		# self.peds_preds = np.load( self.peds_preds, allow_pickle = True ).item()
 		# self.target_peds = h5py.File( self.target_peds, "r" )
 		self.fraction_positives = json.load( open( self.fraction_positives, "r" ) )
@@ -222,7 +223,7 @@ class JudgementDay():
 			ood_dict = {key:[] for key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
 											"Disobind_uncal", "Random_baseline", "masks", 
 											"disorder_mat1", "disorder_mat2", "order_mat",
-											"Aiupred", "Deepdisobind", "targets"]}
+											"Aiupred", "Deepdisobind", "Morfchibi", "targets"]}
 
 			# For all entries.
 			entry_ids = []
@@ -287,6 +288,7 @@ class JudgementDay():
 					elif "Aiupred" in key2:
 						if task == "interface_1":
 							ood_dict[key2].append( self.aiupred[f"{u1}--{u2}_{c}"] )
+						# Empty arrays for all other tasks.
 						else:
 							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
 							ood_dict[key2].append( np.zeros( dummy.shape ) )
@@ -294,6 +296,15 @@ class JudgementDay():
 					elif "Deepdisobind" in key2:
 						if task == "interface_1":
 							ood_dict[key2].append( self.deepdisobind[f"{u1}--{u2}_{c}"] )
+						# Empty arrays for all other tasks.
+						else:
+							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
+							ood_dict[key2].append( np.zeros( dummy.shape ) )
+
+					elif "Morfchibi" in key2:
+						if task == "interface_1":
+							ood_dict[key2].append( self.morfchibi[f"{u1}--{u2}_{c}"] )
+						# Empty arrays for all other tasks.
 						else:
 							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
 							ood_dict[key2].append( np.zeros( dummy.shape ) )
@@ -419,7 +430,7 @@ class JudgementDay():
 											"AF2_Disobind_uncal_order",
 											"AF2_IDR-any", "AF3_IDR-any", "Disobind_uncal_IDR-any",
 											"AF2_Disobind_uncal_IDR-any", "Aiupred", "Deepdisobind",
-											"Random_baseline", ""]:
+											"Morfchibi", "Random_baseline", ""]:
 				for key in subset_dict.keys():
 					subset_dict[key].append( results_dict[key][i] )
 
