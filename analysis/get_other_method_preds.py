@@ -209,6 +209,9 @@ class Othermethods():
 
 					else:
 						raise ValueError( f"Uniprot ID from AIUPred/DeepDisoBind does not match OOD Uniprot ID..." )
+				# aiupred_interface = aiupred_p1.reshape( -1, 1 )
+				# deepdiso_interface = deepdiso_p1.reshape( -1, 1 )
+				# morfchibi_interface = morfchibi_p1.reshape( -1, 1 )
 				aiupred_interface = np.hstack( [aiupred_p1, aiupred_p2] ).reshape( -1, 1 )
 				deepdiso_interface = np.hstack( [deepdiso_p1, deepdiso_p2] ).reshape( -1, 1 )
 				morfchibi_interface = np.hstack( [morfchibi_p1, morfchibi_p2] ).reshape( -1, 1 )
@@ -216,9 +219,6 @@ class Othermethods():
 				self.predictions["aiupred"][ood_entry_id] = aiupred_interface
 				self.predictions["deepdisobind"][ood_entry_id] = deepdiso_interface
 				self.predictions["morfchibi"][ood_entry_id] = morfchibi_interface
-				# self.predictions[ood_entry_id] = {"aiupred": aiupred_interface,
-				# 									"deepdiso": deepdiso_interface
-				# 									}
 
 
 if __name__ == "__main__":
