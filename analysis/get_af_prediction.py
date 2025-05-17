@@ -44,9 +44,9 @@ class AF2MPredictions():
 		self.coarse_grain_sizes = [1, 5, 10]
 		self.device = "cuda"
 		# AF2 or AF3.
-		self.af_model = "AF3"
+		self.af_model = "AF2"
 		# OOD/PEDS predictions
-		self.mode = "peds" # "ood" or "peds"
+		self.mode = "misc" # "ood" or "peds"
 
 		# if self.af_model == "AF2":
 		# 	# Dir containing AF2M predictions.
@@ -70,6 +70,14 @@ class AF2MPredictions():
 			self.cmap = h5py.File( f"../database/PEDS/ped_test_target.h5", "r" )
 			# File to store AF2/3 derived contact maps for OOD set.
 			self.af_pred_dir = f"./AF_peds_preds_v{self.version}/"
+
+		elif self.mode == "misc":
+			# Dir containing AF2/3 predictions.
+			self.af_test_pred_dir = f"{self.af_model}_misc_preds"
+			# OOD set target contact maps.
+			self.cmap = h5py.File( f"../database/Misc/misc_test_target.h5", "r" )
+			# File to store AF2/3 derived contact maps for OOD set.
+			self.af_pred_dir = f"./AF_misc_preds_v{self.version}/"
 
 		else:
 			raise ValueError( "Incorrect mode specified (ood/peds supported)..." )
@@ -433,8 +441,13 @@ class AF2MPredictions():
 			uni_id2, _, _ = head2.split( ":" )
 			header = f"{uni_id1}_{uni_id2}_{num}".lower()
 
-			# AF2 fasta file names consist of: "UniID1--UniID2_num"
-			path = f"{self.base_path}{self.af_test_pred_dir}/fold_{header}/"
+			# AF3 fasta file names consist of: "UniID1--UniID2_num"
+			if os.path.exists( f"{self.base_path}{self.af_test_pred_dir}/fold_{header}/" ):
+				path = f"{self.base_path}{self.af_test_pred_dir}/fold_{header}/"
+			elif os.path.exists( f"{self.base_path}{self.af_test_pred_dir}/{header}/" ):
+				path = f"{self.base_path}{self.af_test_pred_dir}/{header}/"
+			else:
+				raise Exception( f"AF3 output directory not found for {header}..." )
 
 			best_model, score = self.get_best_model( path, header )
 			print( f"Entry {i} Best model --> {key} \t\t {best_model} \t\t {score}" )
