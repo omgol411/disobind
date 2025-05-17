@@ -22,17 +22,17 @@ class JudgementDay():
 		self.data_version = 21
 		self.model_version = 21
 		# path for the dataset dir.
-		self.base_path = f"../database/v_{self.data_version}/"
+		self.base_path = f"../database/"
 		# Seed for the PRNGs.
 		self.global_seed = 11
 		# Cutoff to dfine contact for disobind predictions.
 		self.contact_threshold = 0.5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.75
+		self.iptm_cutoff = 0.0
 		# Max prot1/2 lengths.
 		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
-		self.mode = "ood" # "ood" or "peds" or "misc"
+		self.mode = "misc" # "ood" or "peds" or "misc"
 
 		self.device = "cuda"
 
@@ -40,7 +40,7 @@ class JudgementDay():
 			self.base_af_dir = f"./AF_preds_v{self.data_version}/"
 			self.diso_base_dir = f"./Predictions_{self.mode}_v_{self.data_version}/"
 			# OOD set target contact maps file.
-			self.target_cmap = f"{self.base_path}Target_bcmap_test_v_{self.data_version}.h5"
+			self.target_cmap = f"{self.base_path}v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
 			# Disobind predictions file.
 			self.disobind_preds = f"{self.diso_base_dir}Disobind_Predictions.npy"
 
@@ -75,7 +75,7 @@ class JudgementDay():
 		# self.target_cmap = f"{self.diso_base_dir}/Target_bcmap_test_v_{self.data_version}.h5"
 		# self.target_cmap = f"{self.base_path}v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
 		# Fraction of positives in the dataset for all tasks.
-		self.fraction_positives = f"{self.base_path}T5/global-None/fraction_positives.json"
+		self.fraction_positives = f"{self.base_path}v_{self.data_version}/T5/global-None/fraction_positives.json"
 		# File containing info about the merged binary complexes in the dataset.
 		self.merged_binary_complexes_dir = f"{self.base_path}v_{self.data_version}/merged_binary_complexes/"
 
@@ -118,10 +118,11 @@ class JudgementDay():
 		self.af3_preds = np.load( self.af3_preds, allow_pickle = True ).item()
 		self.disobind_preds = np.load( self.disobind_preds, allow_pickle = True ).item()
 		self.target_cmap = h5py.File( self.target_cmap, "r" )
-		other_methods = np.load( self.other_methods, allow_pickle = True ).item()
-		self.aiupred = other_methods["aiupred"]
-		self.deepdisobind = other_methods["deepdisobind"]
-		self.morfchibi = other_methods["morfchibi"]
+		if self.mode not in ["peds", "misc"]:
+			other_methods = np.load( self.other_methods, allow_pickle = True ).item()
+			self.aiupred = other_methods["aiupred"]
+			self.deepdisobind = other_methods["deepdisobind"]
+			self.morfchibi = other_methods["morfchibi"]
 		# self.peds_preds = np.load( self.peds_preds, allow_pickle = True ).item()
 		# self.target_peds = h5py.File( self.target_peds, "r" )
 		self.fraction_positives = json.load( open( self.fraction_positives, "r" ) )
@@ -219,12 +220,16 @@ class JudgementDay():
 		
 		for task in self.get_tasks():
 			counts = [0, 0, 0]
-			# All fields to be included for the results.
-			ood_dict = {key:[] for key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
-											"Disobind_uncal", "Random_baseline", "masks", 
-											"disorder_mat1", "disorder_mat2", "order_mat",
-											"Aiupred", "Deepdisobind", "Morfchibi", "targets"]}
+			ood_keys = ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
+					"Disobind_uncal", "Random_baseline", "masks", 
+					"disorder_mat1", "disorder_mat2", "order_mat",
+					"targets"]
+			if self.mode not in ["peds", "misc"]:
+				ood_keys.extend( ["Aiupred", "Deepdisobind", "Morfchibi"] )
 
+			# All fields to be included for the results.
+			ood_dict = {key:[] for key in ood_keys}
+			
 			# For all entries.
 			entry_ids = []
 			for idx, key1 in enumerate( self.target_cmap.keys() ):
@@ -285,7 +290,7 @@ class JudgementDay():
 					elif "Disobind" in key2:
 						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
 
-					elif "Aiupred" in key2:
+					elif "Aiupred" in key2 and self.mode not in ["peds", "misc"]:
 						if task == "interface_1":
 							ood_dict[key2].append( self.aiupred[f"{u1}--{u2}_{c}"] )
 						# Empty arrays for all other tasks.
@@ -293,7 +298,7 @@ class JudgementDay():
 							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
 							ood_dict[key2].append( np.zeros( dummy.shape ) )
 
-					elif "Deepdisobind" in key2:
+					elif "Deepdisobind" in key2 and self.mode not in ["peds", "misc"]:
 						if task == "interface_1":
 							ood_dict[key2].append( self.deepdisobind[f"{u1}--{u2}_{c}"] )
 						# Empty arrays for all other tasks.
@@ -301,7 +306,7 @@ class JudgementDay():
 							dummy = self.disobind_preds[key1][task]["Disobind_uncal"]
 							ood_dict[key2].append( np.zeros( dummy.shape ) )
 
-					elif "Morfchibi" in key2:
+					elif "Morfchibi" in key2 and self.mode not in ["peds", "misc"]:
 						if task == "interface_1":
 							ood_dict[key2].append( self.morfchibi[f"{u1}--{u2}_{c}"] )
 						# Empty arrays for all other tasks.
