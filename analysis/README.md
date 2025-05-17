@@ -31,8 +31,16 @@ Check all the paths in the constructor before running the script.
 The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
 
+## Other method predictions
+
+Run the following script for getting predictions for competing methods. 
+
+```
+python get_other_method_predictions.py
+```
+
 ## Perform analysis
-Run the following script on the terminal:
+Run the following script on the terminal (for all methods). 
 
 ```
 python analysis.py
