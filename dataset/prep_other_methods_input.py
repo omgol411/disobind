@@ -1,5 +1,5 @@
 """
-Create input files for running ANCHOR2 and DeepDISOBind.
+Create input files for running AIUPred, DeepDISOBind, and MORFchibi.
 """
 ############ ------>"May the Force serve u well..." <------##############
 #########################################################################
@@ -12,7 +12,7 @@ import os, json
 
 class CreateInput():
     """
-    Get input files for using ANCHOR2 and DeepDISOBind on the OOD set.
+    Get input files for using AIUPred, DeepDISOBind, and MORFchibi on the OOD set.
     """
     def __init__(self):
         self.base_dir = "../database/"
@@ -123,7 +123,7 @@ class CreateInput():
 
     def write_aiupred_input_file( self ):
         """
-        ANCHOR will be used from python, so just saving the ood_seq_dict as is.
+        AIUPred will be used from python, so just saving the ood_seq_dict as is.
         """
         with open( self.aiupred_input_file, "w" ) as w:
             json.dump( self.ood_seq_dict, w )
