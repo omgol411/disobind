@@ -26,3 +26,7 @@ python 4_create_non_redundant_dataset.py -c 100
 ```
 python create_input_embeddings.py
 ```
+
+# Comparison to competing methods 
+
+1. Create inputs to alternate methods. 
