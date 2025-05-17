@@ -32,7 +32,7 @@ class JudgementDay():
 		# Max prot1/2 lengths.
 		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
-		self.mode = "misc" # "ood" or "peds" or "misc"
+		self.mode = "ood" # "ood" or "peds" or "misc"
 
 		self.device = "cuda"
 
@@ -88,6 +88,7 @@ class JudgementDay():
 		# File to store all results.
 		self.full_results_file = f"{self.output_dir}Results_OOD_set_{self.data_version}.csv"
 		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.data_version}.csv"
+		self.other_methods_result_file = f"{self.output_dir}Results_other_methods_{self.data_version}.csv"
 		# self.peds_results_file = f"{self.output_dir}Results_PEDS.csv"
 		
 		# Files for the plots and raw data.
@@ -403,7 +404,10 @@ class JudgementDay():
 				results_dict["Precision"].append( metrics[1] )
 				results_dict["F1-score"].append( metrics[2] )
 
-			# if task == "interface_1":
+			if task == "interface_1":
+				self.eval_other_methods( preds_dict["Disobind_uncal"], preds_dict["Aiupred"],
+										preds_dict["Deepdisobind"], preds_dict["Morfchibi"],
+										torch.from_numpy( ood_dict["targets"] ) )
 			# 	# Create contact density vs interface 1 prediction plots.
 			# 	self.create_performance_contactdensity_plots( entry_ids, 
 			# 													preds_dict["Disobind_uncal"], 
@@ -444,163 +448,162 @@ class JudgementDay():
 
 
 
-	def create_performance_contactdensity_plots( self, entries, diso_preds, af2_preds, diso_af2_preds, target ):
-		"""
-		Create a plot for the performance(Recall/Precision/F1) vs contact density for Interface_1.
-		Save the raw data on disk.
-		Also save the top predictions (> 0.7 F1 score) on disk.
+	# def create_performance_contactdensity_plots( self, entries, diso_preds, af2_preds, diso_af2_preds, target ):
+	# 	"""
+	# 	Create a plot for the performance(Recall/Precision/F1) vs contact density for Interface_1.
+	# 	Save the raw data on disk.
+	# 	Also save the top predictions (> 0.7 F1 score) on disk.
 
-		Input:
-		----------
-		entries --> list of all entry_id for all OOD entries.
-		diso_preds --> (torch.tensor) Calibrated Disobind prediction.
-		af2_preds --> (torch.tensor) AF2 predictions.
-		target --> (torch.tensor) binary output labels.
+	# 	Input:
+	# 	----------
+	# 	entries --> list of all entry_id for all OOD entries.
+	# 	diso_preds --> (torch.tensor) Calibrated Disobind prediction.
+	# 	af2_preds --> (torch.tensor) AF2 predictions.
+	# 	target --> (torch.tensor) binary output labels.
 
-		Returns:
-		----------
-		None
-		"""
-		entries = np.array( entries )
+	# 	Returns:
+	# 	----------
+	# 	None
+	# 	"""
+	# 	entries = np.array( entries )
 
-		# Get per OOD entry metrics.
-		metrics_diso = torch_metrics( preds = diso_preds.to( self.device ), 
-								target = torch.from_numpy( target ).to( self.device ), 
-								threshold = self.contact_threshold,
-								multidim_avg = "samplewise_none", device = self.device )
+	# 	# Get per OOD entry metrics.
+	# 	metrics_diso = torch_metrics( preds = diso_preds.to( self.device ), 
+	# 							target = torch.from_numpy( target ).to( self.device ), 
+	# 							threshold = self.contact_threshold,
+	# 							multidim_avg = "samplewise_none", device = self.device )
 		
 
-		metrics_af2 = torch_metrics( preds = af2_preds.to( self.device ), 
-								target = torch.from_numpy( target ).to( self.device ), 
-								threshold = self.contact_threshold,
-								multidim_avg = "samplewise_none", device = self.device )
+	# 	metrics_af2 = torch_metrics( preds = af2_preds.to( self.device ), 
+	# 							target = torch.from_numpy( target ).to( self.device ), 
+	# 							threshold = self.contact_threshold,
+	# 							multidim_avg = "samplewise_none", device = self.device )
 
-		metrics_diso_af2 = torch_metrics( preds = diso_af2_preds.to( self.device ), 
-									target = torch.from_numpy( target ).to( self.device ), 
-									threshold = self.contact_threshold,
-									multidim_avg = "samplewise_none", device = self.device )
+	# 	metrics_diso_af2 = torch_metrics( preds = diso_af2_preds.to( self.device ), 
+	# 								target = torch.from_numpy( target ).to( self.device ), 
+	# 								threshold = self.contact_threshold,
+	# 								multidim_avg = "samplewise_none", device = self.device )
 		
-		contact_density = []
-		for i, id_ in enumerate( entries ):
-			head1, head2 = id_.split( "--" )
-			head2, num = head2.split( "_" )
-			uni_id1, r11, r12 = head1.split( ":" )
-			uni_id2, r21, r22 = head2.split( ":" )
-			len1 = int( r12 ) - int( r11 ) + 1
-			len2 = int( r22 ) - int( r21 ) + 1
+	# 	contact_density = []
+	# 	for i, id_ in enumerate( entries ):
+	# 		head1, head2 = id_.split( "--" )
+	# 		head2, num = head2.split( "_" )
+	# 		uni_id1, r11, r12 = head1.split( ":" )
+	# 		uni_id2, r21, r22 = head2.split( ":" )
+	# 		len1 = int( r12 ) - int( r11 ) + 1
+	# 		len2 = int( r22 ) - int( r21 ) + 1
 			
-			contacts = np.count_nonzero( target[i] )
-			num_elements = len1 + len2
+	# 		contacts = np.count_nonzero( target[i] )
+	# 		num_elements = len1 + len2
 
-			contact_density.append( contacts/num_elements )
+	# 		contact_density.append( contacts/num_elements )
 
-		contact_density = np.array( contact_density ).reshape( len( entries ), 1 )
+	# 	contact_density = np.array( contact_density ).reshape( len( entries ), 1 )
 
-		re_diso = metrics_diso[0].cpu().numpy()
-		prec_diso = metrics_diso[1].cpu().numpy()
-		f1_diso = metrics_diso[2].cpu().numpy()
+	# 	re_diso = metrics_diso[0].cpu().numpy()
+	# 	prec_diso = metrics_diso[1].cpu().numpy()
+	# 	f1_diso = metrics_diso[2].cpu().numpy()
 
-		re_af2 = metrics_af2[0].cpu().numpy()
-		prec_af2 = metrics_af2[1].cpu().numpy()
-		f1_af2 = metrics_af2[2].cpu().numpy()
+	# 	re_af2 = metrics_af2[0].cpu().numpy()
+	# 	prec_af2 = metrics_af2[1].cpu().numpy()
+	# 	f1_af2 = metrics_af2[2].cpu().numpy()
 
-		re_diso_af2 = metrics_diso_af2[0].cpu().numpy()
-		prec_diso_af2 = metrics_diso_af2[1].cpu().numpy()
-		f1_diso_af2 = metrics_diso_af2[2].cpu().numpy()
+	# 	re_diso_af2 = metrics_diso_af2[0].cpu().numpy()
+	# 	prec_diso_af2 = metrics_diso_af2[1].cpu().numpy()
+	# 	f1_diso_af2 = metrics_diso_af2[2].cpu().numpy()
 
-		fig, ax = plt.subplots( 1, 3, figsize = ( 20, 8 ) )
-		ax[0].scatter( contact_density, re_diso )
-		ax[0].set_ylabel( "Recall" )
-		ax[0].set_xlabel( "Contact density" )
+	# 	fig, ax = plt.subplots( 1, 3, figsize = ( 20, 8 ) )
+	# 	ax[0].scatter( contact_density, re_diso )
+	# 	ax[0].set_ylabel( "Recall" )
+	# 	ax[0].set_xlabel( "Contact density" )
 
-		ax[1].scatter( contact_density, prec_diso )
-		ax[1].set_ylabel( "Precision" )
-		ax[1].set_xlabel( "Contact density" )
+	# 	ax[1].scatter( contact_density, prec_diso )
+	# 	ax[1].set_ylabel( "Precision" )
+	# 	ax[1].set_xlabel( "Contact density" )
 		
-		ax[2].scatter( contact_density, f1_diso )
-		ax[2].set_ylabel( "F1 score" )
-		ax[2].set_xlabel( "Contact density" )
+	# 	ax[2].scatter( contact_density, f1_diso )
+	# 	ax[2].set_ylabel( "F1 score" )
+	# 	ax[2].set_xlabel( "Contact density" )
 
-		plt.savefig( f"{self.contact_density_file}.png", dpi = 300 )
-		plt.close()
+	# 	plt.savefig( f"{self.contact_density_file}.png", dpi = 300 )
+	# 	plt.close()
 
-		# Save samplewsie metrics for Disobind and AF2 on OOD set.
-		df = pd.DataFrame()
-		df["Entry ID"] = entries
-		df["Contact density"] = np.round( contact_density.reshape( -1 ), 3 )
-		df["Recall"] = np.round( list( re_diso ), 3 )
-		df["Precision"] = np.round( list( prec_diso ), 3 )
-		df["F1"] = np.round( list( f1_diso ), 3 )
-		df["AF2-Recall"] = np.round( list( re_af2 ), 3 )
-		df["AF2-Precision"] = np.round( list( prec_af2 ), 3 )
-		df["AF2-F1"] = np.round( list( f1_af2 ), 3 )
-		df["Diso+AF2-Recall"] = np.round( list( re_diso_af2 ), 3 )
-		df["Diso+AF2-Precision"] = np.round( list( prec_diso_af2 ), 3 )
-		df["Diso+AF2-F1"] = np.round( list( f1_diso_af2 ), 3 )
-		df.to_csv( f"{self.contact_density_file}.csv" )
+	# 	# Save samplewsie metrics for Disobind and AF2 on OOD set.
+	# 	df = pd.DataFrame()
+	# 	df["Entry ID"] = entries
+	# 	df["Contact density"] = np.round( contact_density.reshape( -1 ), 3 )
+	# 	df["Recall"] = np.round( list( re_diso ), 3 )
+	# 	df["Precision"] = np.round( list( prec_diso ), 3 )
+	# 	df["F1"] = np.round( list( f1_diso ), 3 )
+	# 	df["AF2-Recall"] = np.round( list( re_af2 ), 3 )
+	# 	df["AF2-Precision"] = np.round( list( prec_af2 ), 3 )
+	# 	df["AF2-F1"] = np.round( list( f1_af2 ), 3 )
+	# 	df["Diso+AF2-Recall"] = np.round( list( re_diso_af2 ), 3 )
+	# 	df["Diso+AF2-Precision"] = np.round( list( prec_diso_af2 ), 3 )
+	# 	df["Diso+AF2-F1"] = np.round( list( f1_diso_af2 ), 3 )
+	# 	df.to_csv( f"{self.contact_density_file}.csv" )
 
-		# Save samplewsie metrics for Disobind and AF2 on best performing pairs.
-		idx = np.where( f1_diso_af2 > 0.7 )
-		top = entries[idx]
+	# 	# Save samplewsie metrics for Disobind and AF2 on best performing pairs.
+	# 	idx = np.where( f1_diso_af2 > 0.7 )
+	# 	top = entries[idx]
 
-		df = pd.DataFrame()
-		df["Entry ID"] = top
-		df["Contact density"] = np.round( contact_density[idx], 3 )
-		df["Recall"] = np.round( re_diso[idx], 3 )
-		df["Precision"] = np.round( prec_diso[idx], 3 )
-		df["F1 score"] = np.round( f1_diso[idx], 3 )
-		df["AF2-Recall"] = np.round( re_af2[idx], 3 )
-		df["AF2-Precision"] = np.round( prec_af2[idx], 3 )
-		df["AF2-F1 score"] = np.round( f1_af2[idx], 3 )
-		df["Diso+AF2-Recall"] = np.round( list( re_diso_af2[idx] ), 3 )
-		df["Diso+AF2-Precision"] = np.round( list( prec_diso_af2[idx] ), 3 )
-		df["Diso+AF2-F1"] = np.round( list( f1_diso_af2[idx] ), 3 )
-		df.to_csv( f"{self.top_preds_file}.csv" )
+	# 	df = pd.DataFrame()
+	# 	df["Entry ID"] = top
+	# 	df["Contact density"] = np.round( contact_density[idx], 3 )
+	# 	df["Recall"] = np.round( re_diso[idx], 3 )
+	# 	df["Precision"] = np.round( prec_diso[idx], 3 )
+	# 	df["F1 score"] = np.round( f1_diso[idx], 3 )
+	# 	df["AF2-Recall"] = np.round( re_af2[idx], 3 )
+	# 	df["AF2-Precision"] = np.round( prec_af2[idx], 3 )
+	# 	df["AF2-F1 score"] = np.round( f1_af2[idx], 3 )
+	# 	df["Diso+AF2-Recall"] = np.round( list( re_diso_af2[idx] ), 3 )
+	# 	df["Diso+AF2-Precision"] = np.round( list( prec_diso_af2[idx] ), 3 )
+	# 	df["Diso+AF2-F1"] = np.round( list( f1_diso_af2[idx] ), 3 )
+	# 	df.to_csv( f"{self.top_preds_file}.csv" )
 
-		plt.scatter( f1_diso[idx], f1_af2[idx], color = "blue" )
-		plt.xlim( 0.5, 1 )
-		plt.ylim( -0.1, 1 )
-		plt.savefig( f"{self.top_preds_diso_af2_file}.png", dpi = 300 )
-		plt.close()
+	# 	plt.scatter( f1_diso[idx], f1_af2[idx], color = "blue" )
+	# 	plt.xlim( 0.5, 1 )
+	# 	plt.ylim( -0.1, 1 )
+	# 	plt.savefig( f"{self.top_preds_diso_af2_file}.png", dpi = 300 )
+	# 	plt.close()
 
-
-	def eval_peds_performance( self ):
+	def eval_other_methods( self, diso_preds: torch.tensor, aiupred_preds: torch.tensor,
+							deepdisobind_preds: torch.tensor, morfchibi_preds: torch.tensor,
+							target: torch.tensor ):
 		"""
-		Calculate metric for performance on PEDS daatset.
+		Compare Disobind performance with AIUPred, DeepDisoBind, and MORfchibi.
+		The later 3 are partner-independent interface predictors for IDRs and
+			so we evaluate performance only for the prot1 in all OOD entries
+			which is an IDR.
 		"""
-		print( "Evaluation for PEDS..." )
-		peds_results_dict = {key:[] for key in ["Objective", "CG", "Recall",
-												"Precision", "F1-score"]}
-		for task in self.get_tasks():
-			print( f"Task {task}..." )
-			preds, targets = [], []
+		# Need to slice out the protein1 interface only from diso_preds and target.
+		diso_p1 = diso_preds[:,:self.max_len].to( self.device )
+		aiupred_p1 = aiupred_preds[:,:self.max_len].to( self.device )
+		deepdisobind_p1 = deepdisobind_preds[:,:self.max_len].to( self.device )
+		morfchibi_p1 = morfchibi_preds[:,:self.max_len].to( self.device )
+		target_p1 = target[:,:self.max_len].to( self.device )
 
-			for entry_id in self.peds_preds:
-				target = self.target_peds[entry_id]
-				target = np.array( self.target_peds[entry_id] )
-				target = self.prepare_target( target, task )
+		diso_metrics = self.calculate_metrics( pred = diso_p1,
+													target = target_p1,
+													multidim_avg = "global" )
+		aiupred_metrics = self.calculate_metrics( pred = aiupred_p1,
+													target = target_p1,
+													multidim_avg = "global" )
+		deepdisobind_metrics = self.calculate_metrics( pred = deepdisobind_p1,
+														target = target_p1,
+														multidim_avg = "global" )
+		morfchibi_metrics = self.calculate_metrics( pred = morfchibi_p1,
+													target = target_p1,
+													multidim_avg = "global" )
 
-				# PEDS predictions have the same organization as the OOD set predictions.
-				preds.append( np.array( self.peds_preds[entry_id][task]["Disobind_uncal"] ) )
-				targets.append( target )
 
-			preds = torch.from_numpy( np.stack( preds ) )
-			targets = torch.from_numpy( np.stack( targets ) )
+		df = pd.DataFrame()
+		df["Model"] = ["Disobind_uncal", "Aiupred", "Deepdisobind", "Morfchibi"]
+		df["Recall"] = [diso_metrics[0], aiupred_metrics[0], deepdisobind_metrics[0], morfchibi_metrics[0]]
+		df["Precision"] = [diso_metrics[1], aiupred_metrics[1], deepdisobind_metrics[1], morfchibi_metrics[1]]
+		df["F1-score"] = [diso_metrics[2], aiupred_metrics[2], deepdisobind_metrics[2], morfchibi_metrics[2]]
+		df.to_csv( self.other_methods_result_file, index = False )
 
-			obj, cg = task.split( "_" )
-
-			metrics = self.calculate_metrics( pred = preds.to( self.device ),
-												target = targets.to( self.device ),
-												multidim_avg = "global" )
-
-			peds_results_dict["Objective"].append( obj.title() )
-			peds_results_dict["CG"].append( cg )
-			peds_results_dict["Recall"].append( metrics[0] )
-			peds_results_dict["Precision"].append( metrics[1] )
-			peds_results_dict["F1-score"].append( metrics[2] )
-
-		df = pd.DataFrame( peds_results_dict )
-		df.to_csv( self.peds_results_file, index = False )
 
 
 	def eval_single( self ):
