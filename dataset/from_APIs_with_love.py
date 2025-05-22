@@ -880,7 +880,7 @@ def from_pdb_rest_api_with_love( entry_id, max_trials = 10, wait_time = 5, custo
 				entity_dict[entity_id] = get_pdb_entity_info( entry_id, entity_id, max_trials = max_trials, wait_time = wait_time )
 
 				if entity_dict[entity_id] == "not_found":
-					return None
+					return None #TODO return before break? 
 					break
 
 			# Count all chains that exist in the PDB - protein and non-protein.
