@@ -24,7 +24,8 @@ class IdppiInput():
 		self.diso_uni_seq_file = os.path.join( self.base_dir, "v_21/Uniprot_seq.json" )
 
 		self.cores = 100
-		self.max_len = 200
+		self.max_frag_len = 200
+		self.max_seq_len = 5000
 		# If True, ignores protein pairs which are present in Disobind dataset.
 		self.remove_diso_seq = True
 		
@@ -36,6 +37,7 @@ class IdppiInput():
 		self.uniprot_seq_file = os.path.join( self.idppi_output_dir, "Uniprot_seq_idppi.json" )
 		# .csv file containing IDPPI entry_ids for Disobind.
 		self.diso_input_file = os.path.join( self.idppi_output_dir, "IDPPI_input_diso.csv" )
+		self.idppi_target_file = os.path.join( self.idppi_output_dir, "IDPPI_target.json" )
 		self.logs_file = os.path.join( self.idppi_output_dir, "Logs.txt" )
 
 
@@ -137,12 +139,19 @@ class IdppiInput():
 
 	def filter_idppi_pairs( self, idppi_pairs: Dict ):
 		"""
-		Ignore protein pairs for which UniProt seq could not be downloaded.
+		Ignore protein pairs for which:
+			UniProt seq could not be downloaded.
+			UniProt seq len > max_seq_len.
 		"""
 		idppi_test_dict = {}
 		for pair_id in idppi_pairs:
 			uni_id1, uni_id2 = pair_id.split( "--" )
 			if uni_id1 not in self.uniprot_seq_dict or uni_id2 not in self.uniprot_seq_dict:
+				continue
+			elif ( 
+					( len( self.uniprot_seq_dict[uni_id1] ) > self.max_seq_len ) or 
+					( len( self.uniprot_seq_dict[uni_id1] ) > self.max_seq_len )
+					):
 				continue
 			else:
 				idppi_test_dict[pair_id] = idppi_pairs[pair_id]
@@ -151,11 +160,15 @@ class IdppiInput():
 
 	def prot_to_fragments( self, seq_len: int ):
 		"""
-		Create fragments of size max_len for a protein given its length.
+		Create fragments of size max_frag_len for a protein given its length.
 		"""
 		fragments = []
-		for frag_start in np.arange( 1, seq_len+1, self.max_len ):
-			frag_end = frag_start+self.max_len if frag_start+self.max_len <= seq_len else seq_len
+		for frag_start in np.arange( 1, seq_len, self.max_frag_len ):
+			if frag_start+self.max_frag_len <= seq_len:
+				frag_end = frag_start+self.max_frag_len-1
+			else:
+				frag_end = seq_len
+			# frag_end = frag_start+self.max_frag_len-1 if frag_start+self.max_frag_len <= seq_len else seq_len
 			fragments.append( [frag_start, frag_end] )
 		return fragments
 
@@ -211,6 +224,15 @@ class IdppiInput():
 		self.logger["total_idpi_entry_ids"] = len( disobind_input_pairs )
 		with open( self.diso_input_file, "w" ) as w:
 			w.writelines( ",".join( disobind_input_pairs ) )
+		with open( self.idppi_target_file, "w" ) as w:
+			json.dump( idppi_test_dict, w )
+
+		target_labels = list( idppi_test_dict.values() )
+		total = len( target_labels )
+		pos_pairs = np.count_nonzero( np.array( target_labels ).astype( int ) )
+		self.logger["interacting_pairs_count"] = pos_pairs
+		self.logger["non_interacting_pairs_count"] = total-pos_pairs
+
 
 
 	def write_logs( self ):
@@ -221,7 +243,8 @@ class IdppiInput():
 			w.writelines( "------------------- IDPPI Logs -------------------\n" )
 			w.writelines( "Configs -----\n" )
 			w.writelines( f"Cores: {self.cores}\n" )
-			w.writelines( f"Max seq len: {self.max_len}\n" )
+			w.writelines( f"Max fragment len: {self.max_frag_len}\n" )
+			w.writelines( f"Max sequence len: {self.max_seq_len}\n" )
 			w.writelines( f"Redundancy reduce with v_21 UniProt seq: {self.remove_diso_seq}\n" )
 			w.writelines( "\nStats -----\n" )
 			w.writelines( f"Total IDPPI protein pairs = {self.logger['idppi_pairs']}\n" )
@@ -229,7 +252,10 @@ class IdppiInput():
 			w.writelines( f"Total UniProt seq obtained = {self.logger['uni_seq_dwnld']}\n" )
 			w.writelines( f"Selected IDPPI pairs = {self.logger['selected_idppi_pairs']}\n" )
 			w.writelines( f"Total IDPPI entry_ids obtained = {self.logger['total_idpi_entry_ids']}\n" )
+			w.writelines( f"\tTotal Interacting pairs = {self.logger['interacting_pairs_count']}\n" )
+			w.writelines( f"\tTotal non-Interacting pairs = {self.logger['non_interacting_pairs_count']}\n" )
 
 
 if __name__ == "__main__":
 	IdppiInput().forward()
+
