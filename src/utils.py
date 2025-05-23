@@ -357,7 +357,7 @@ def dump_metrics( train, dev, test, time_dict, version, num_metrics, epoch = -1 
 	for key in train.keys():
 		if epochs == None:
 			epochs = train[key].shape[0]
-			num = int( 0.1*epochs ) if epochs > 5 else epochs
+			num = int( 0.2*epochs ) if epochs > 5 else epochs
 			print( num )
 		dif = ( train[key][-num:,0] - dev[key][-num:,0] )/train[key][-num:,0]
 		tmp.append( np.mean( dif )*100 )
