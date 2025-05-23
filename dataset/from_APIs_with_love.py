@@ -855,7 +855,7 @@ def from_pdb_rest_api_with_love( entry_id, max_trials = 10, wait_time = 5, custo
 		entry_data = get_pdb_entry_info( entry_id, max_trials = max_trials, wait_time = wait_time )
 
 	# PDB ID does not exist.
-	if entry_data == "not_found":
+	if entry_data == "not_found": # TODO this will depend on previous condition
 		return None
  
 	else:
@@ -868,7 +868,7 @@ def from_pdb_rest_api_with_love( entry_id, max_trials = 10, wait_time = 5, custo
 		
 		# Dict to store entity data from PDB API for each entity ID.
 		# Use existing one else create anew.
-		entity_dict = {} if entity_data == None else entity_data
+		entity_dict = {} if entity_data == None else entity_data  # TODO this can be taken inside the for loop. Redundant.
 
 		row_idx = 0
 
