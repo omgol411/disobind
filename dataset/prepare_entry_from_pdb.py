@@ -37,6 +37,7 @@ class TereNaam():
         self.misc_test_input = os.path.join( self.misc_dir, "misc_test_input.csv" )
         self.misc_test_target = os.path.join( self.misc_dir, "misc_test_target.h5" )
         self.af2_input_file = os.path.join( self.misc_dir, "AF2_misc_fasta_paths.txt" )
+        self.complexes_summary_file = os.path.join( self.misc_dir, "Summary.json" )
 
         self.select_chains = {
             # "1dt7": [],
@@ -222,7 +223,10 @@ class TereNaam():
 
             uni_start_pos = uni_pos[0]
             uni_end_pos = uni_pos[-1]
+            pdb_start_pos = pdb_pos[0]
+            pdb_end_pos = pdb_pos[-1]
             chain_uni_map[chain]["pdb_pos"] = pdb_pos
+            chain_uni_map[chain]["pdb_res"] = [pdb_start_pos, pdb_end_pos]
             chain_uni_map[chain]["uni_res"] = [uni_start_pos, uni_end_pos]
             chain_uni_map[chain]["length"] = uni_end_pos - uni_start_pos + 1
         return chain_uni_map, any( max_len_exceed )
@@ -349,7 +353,7 @@ class TereNaam():
             Any chain in PDB exceed max length.
             Mismatch in seq length and cmap dim.
         """
-        misc_data = {"entry_id": [], "cmap": {}, "seq": {}, "pdb": {}}
+        misc_data = {"entry_id": [], "cmap": {}, "seq": {}, "pdb": {}, "acc": {}}
 
         # PDB IDs from PEDS + SV's gold mine
         from_peds = ["2jwn", "2dt7", "2n3a", "2jss", "2mkr"]
@@ -396,7 +400,7 @@ class TereNaam():
 
             success_size = self.check_seq_cmap_size( chain_uni_map, contact_map )
             if not success_size:
-                print( "mismatch in seq length and cmap size..." )
+                print( "Mismatch in seq length and cmap size..." )
                 continue
 
             # if np.count_nonzero( contact_map ) == 0:
@@ -409,6 +413,10 @@ class TereNaam():
             # print( np.count_nonzero( contact_map )/contact_map.size )
             misc_data["seq"][uni_id_pair] = [prot1_seq, prot2_seq]
             misc_data["pdb"][uni_id_pair] = pdb_id
+            misc_data["acc"][uni_id_pair] = {
+                            "pdb": pdb_id,
+                            "chain_uni_map": chain_uni_map
+            }
 
         print( "\n" )
         print( "Total PDB IDs obtained: ", len( misc_data["entry_id"] ) )
@@ -416,7 +424,49 @@ class TereNaam():
         return misc_data
 
 
-    def create_af2_input( self, misc_data:Dict ):
+    def write_summary_file( self, acc_dict: Dict ):
+        """
+        Write relevant info for all selected entries to a .txt summary file.
+        """
+        summary_dict = {}
+        for idx, uni_id_pair in enumerate( acc_dict ):
+            pdb_id = acc_dict[uni_id_pair]["pdb"]
+            chain_uni_map = acc_dict[uni_id_pair]["chain_uni_map"]
+
+            summary_dict[uni_id_pair] = {}
+            for chain in chain_uni_map:
+                uni_res = chain_uni_map[chain]["uni_res"]
+                pdb_res = chain_uni_map[chain]["pdb_res"]
+
+                summary_dict[uni_id_pair]["pdb_id"] = pdb_id
+                summary_dict[uni_id_pair][chain] = {
+                                        "uni_res": uni_res,
+                                        "pdb_res": pdb_res
+                }
+        with open( self.complexes_summary_file, "w" ) as w:
+            json.dump( summary_dict, w, indent = 4 )
+
+
+        # w = open( self.complexes_summary_file, "w" )
+        # w.writelines( "-------------- case study complexes --------------\n\n" )
+        # for idx, uni_id_pair in enumerate( acc_dict ):
+        #     pdb_id = acc_dict[uni_id_pair]["pdb"]
+        #     chain_uni_map = acc_dict[uni_id_pair]["chain_uni_map"]
+
+        #     w.writelines( f"{idx}. {uni_id_pair} --> {pdb_id}\n" )
+
+        #     for chain in chain_uni_map:
+        #         uni_res = chain_uni_map[chain]["uni_res"]
+        #         uni_res = "-".join( map( str, uni_res ) )
+        #         pdb_res = chain_uni_map[chain]["pdb_res"]
+        #         pdb_res = "-".join( map( str, pdb_res ) )
+
+        #         w.writelines( f"\n\t{chain} \t PDB res = {pdb_res} \t UniProt res = {uni_res}" )
+        #     w.writelines( "\n\n" )
+        # w.close()
+
+
+    def create_af2_input( self, misc_data: Dict ):
         """
         Create a directory containng fasta files to be used as input by AF2.
             Each file contains Uniprot seq for the protein pairs with 
@@ -505,6 +555,8 @@ class TereNaam():
 
 
     def save( self, misc_data: Dict ):
+        self.write_summary_file( misc_data["acc"] )
+
         with open( self.misc_pdbs_file, "w" ) as w:
             w.writelines( ",".join( sorted( misc_data["pdb"].values() ) ) )
 
