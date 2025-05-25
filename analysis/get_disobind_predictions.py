@@ -582,7 +582,6 @@ class Prediction():
 			raise Exception( f"Unrecognized objective {cg}..." )
 
 
-
 	def predict( self ):
 		"""
 		Predict cmap for the input protein pair from all models.
@@ -607,21 +606,21 @@ class Prediction():
 		"""
 		
 		# For all entries in OOD set.
-		for idx, key in enumerate( self.prot1_emb.keys() ):
-			head1, head2 = key.split( "--" )
+		for idx, entry_id in enumerate( self.prot1_emb.keys() ):
+			head1, head2 = entry_id.split( "--" )
 			head2, num = head2.split( "_" )
 			uni_id1, _, _ = head1.split( ":" )
 			uni_id2, _, _ = head2.split( ":" )
 			header = f"{uni_id1}--{uni_id2}_{num}"
 
 			# Ignoring this entry, as AF2-multimer crashed for this.
-			if key == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+			if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
 				continue
 
-			self.predictions[key] = {}
-			prot1_emb = np.array( self.prot1_emb[key] )
-			prot2_emb = np.array( self.prot2_emb[key] )
-			target_cmap = np.array( self.cmaps[key] )
+			self.predictions[entry_id] = {}
+			prot1_emb = np.array( self.prot1_emb[entry_id] )
+			prot2_emb = np.array( self.prot2_emb[entry_id] )
+			target_cmap = np.array( self.cmaps[entry_id] )
 
 			# For all objectives (interaction, interface).
 			for obj in self.parameters.keys():
@@ -630,7 +629,9 @@ class Prediction():
 				for cg in self.parameters[obj].keys():
 					model = self.apply_settings( obj, cg )
 
-					prot1, prot2, target, target_mask, eff_len = self.get_input_tensors( key, prot1_emb, prot2_emb, target_cmap )
+					( prot1, prot2, target,
+						target_mask, eff_len ) = self.get_input_tensors( entry_id, prot1_emb,
+																		prot2_emb, target_cmap )
 					
 					# get model predictions.
 					with torch.no_grad():
@@ -643,9 +644,9 @@ class Prediction():
 					uncal_output = uncal_output.detach().cpu().numpy()
 					target_mask = target_mask.detach().cpu().numpy().reshape( uncal_output.shape )
 
-					disorder_mat1, disorder_mat2, order_mat = self.get_disorder_matrix( key, obj, cg )
-					
-					self.predictions[key][f"{obj}_{cg}"] = {
+					disorder_mat1, disorder_mat2, order_mat = self.get_disorder_matrix( entry_id, obj, cg )
+
+					self.predictions[entry_id][f"{obj}_{cg}"] = {
 													"Disobind_uncal": uncal_output,
 													"masks": target_mask,
 													"disorder_mat1": disorder_mat1,
