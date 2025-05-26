@@ -336,7 +336,7 @@ class IdppiPreds():
 					output_dict[metric].append( metrics[i] )
 				print( metrics )
 			for k in output_dict:
-				output_dict[k].append( " " )
+				output_dict[k].append( "" )
 			print( "\n------------------------------------\n" )
 		return output_dict
 
@@ -450,10 +450,12 @@ class IdppiPreds():
 			pred_interface = self.predictions[pair_id][entry_id]
 			# pred_interface = np.where( pred_interface > self.contact_threshold, 1, 0 )
 			frag_pred.append( np.max( pred_interface ) )
-		if np.max( frag_pred ) > self.contact_threshold:
-			ppi_pred = 1
-		else:
-			ppi_pred = 0
+		ppi_pred = np.max( frag_pred )
+
+		# if np.max( frag_pred ) > self.contact_threshold:
+		# 	ppi_pred = 1
+		# else:
+		# 	ppi_pred = 0
 		return name, ppi_pred
 
 
@@ -478,10 +480,11 @@ class IdppiPreds():
 			# print( pred_interface.shape )
 			# exit()
 			frag_pred.append( np.mean( pred_interface ) )
-		if np.max( frag_pred ) > self.contact_threshold:
-			ppi_pred = 1
-		else:
-			ppi_pred = 0
+		ppi_pred = np.max( frag_pred )
+		# if np.max( frag_pred ) > self.contact_threshold:
+		# 	ppi_pred = 1
+		# else:
+		# 	ppi_pred = 0
 		return name, ppi_pred
 
 
@@ -507,10 +510,12 @@ class IdppiPreds():
 			pred_interface = np.concatenate( [p1_interface, p2_interface], axis = 0 )
 
 			frag_pred.append( np.mean( pred_interface ) )
-		if np.mean( frag_pred ) > self.contact_threshold:
-			ppi_pred = 1
-		else:
-			ppi_pred = 0
+		ppi_pred = np.mean( frag_pred )
+
+		# if np.mean( frag_pred ) > self.contact_threshold:
+		# 	ppi_pred = 1
+		# else:
+		# 	ppi_pred = 0
 		return name, ppi_pred
 
 
@@ -585,12 +590,12 @@ class IdppiPreds():
 		# 	# plt.show()
 		# 	plt.close()
 		# 	exit()
-
-		if ( ( np.mean( protein1 ) > self.contact_threshold ) and
-				( np.mean( protein2 ) > self.contact_threshold ) ):
-			ppi_pred = 1
-		else:
-			ppi_pred = 0
+		ppi_pred = ( np.mean( protein1 ) + np.mean( protein2 ) )/2
+		# if ( ( np.mean( protein1 ) > self.contact_threshold ) and
+		# 		( np.mean( protein2 ) > self.contact_threshold ) ):
+		# 	ppi_pred = 1
+		# else:
+		# 	ppi_pred = 0
 		return name, ppi_pred
 
 	################################################################################
@@ -624,7 +629,6 @@ class IdppiPreds():
 		"""
 		df = pd.DataFrame( output_dict )
 		df.to_csv( self.output_dict_file, index = False )
-
 
 
 if __name__ == "__main__":
