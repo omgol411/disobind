@@ -4,6 +4,7 @@ Run Disobind for all protein pairs selected from IDPPI test set.
 import os, json, time, subprocess
 from typing import List, Dict
 import numpy as np
+import pandas as pd
 from omegaconf import OmegaConf
 
 import torch
@@ -30,9 +31,10 @@ class IdppiPreds():
 		self.model_version = 21
 		self.batch_size = 1000
 		self.max_len = 200
+		# Threshold to define a contact from Disobind output.
 		self.contact_threshold = 0.5
 		self.device = "cuda"
-		self.scope = "global"
+		self.scope = "global" # global/local
 		self.embedding_type = "T5"
 
 		self.predictions = {}
@@ -49,6 +51,7 @@ class IdppiPreds():
 		# 									"idppi_embeddings.h5" )
 		self.predictions_file = os.path.join( self.output_dir, "Disobind_Predictions_idppi.npy" )
 		# self.predictions_file = "/data2/kartik/Disorder_Proteins/disobind/analysis/idppi_preds/Disobind_Predictions_idppi.npy"
+		self.output_dict_file = os.path.join( self.output_dir, "Results_IDPPI.csv" )
 
 
 	def forward( self ):
@@ -66,7 +69,9 @@ class IdppiPreds():
 			toc = time.time()
 			print( f"Total time taken for Disobind prediction = {( toc-tic )/60} minutes" )
 
-		self.analysis_idppi()
+		output_dict = self.analysis_idppi()
+
+		self.save_results( output_dict )
 
 		print( "May the Force be with you..." )
 
@@ -307,11 +312,13 @@ class IdppiPreds():
 			2. If both prot1/2 for any fragment pair has predicted interfaces.
 		"""
 		print( "\nIDPPI analysis..." )
+		output_dict = {k:[] for k in ["test_name", "contact_threshold", "Recall", "Precision",
+										"F1score", "AvgPrecision", "MCC", "AUROC", "Accuracy"]}
 		with open( self.idppi_targets_file, "r" ) as f:
 			targets_dict = json.load( f )
 
-		# for ct in [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]:
-		for ct in [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9999]:
+		for ct in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99]:
+		# for ct in [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 0.995, 0.999, 0.9999]:
 			self.contact_threshold = ct
 			print( f"Contact threshold = {self.contact_threshold}..." )
 
@@ -321,8 +328,17 @@ class IdppiPreds():
 			for test_name in preds_dict:
 				print( f"{test_name} ---------" )
 				metrics = self.calculate_metrics( preds_dict[test_name], targets )
+
+				output_dict["test_name"].append( test_name )
+				output_dict["contact_threshold"].append( ct )
+				for i, metric in enumerate( ["Recall", "Precision", "F1score", "AvgPrecision",
+												"MCC", "AUROC", "Accuracy"] ):
+					output_dict[metric].append( metrics[i] )
 				print( metrics )
+			for k in output_dict:
+				output_dict[k].append( " " )
 			print( "\n------------------------------------\n" )
+		return output_dict
 
 
 	def prepare_pred_target_tensors( self, ppi_dict: Dict, targets_dict: Dict ):
@@ -598,6 +614,17 @@ class IdppiPreds():
 					] ) #.reshape( 1, 7 )
 
 		return np.round( metric_array, 2 )
+
+
+	################################################################################
+	################################################################################
+	def save_results( self, output_dict: Dict[str, List] ):
+		"""
+		Save the results dict as a .csv file.
+		"""
+		df = pd.DataFrame( output_dict )
+		df.to_csv( self.output_dict_file, index = False )
+
 
 
 if __name__ == "__main__":
