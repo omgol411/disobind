@@ -32,7 +32,8 @@ The contact maps from AF2/AF3 predicted structures are corrected based on the pL
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
 
 ## Other method predictions
-NOTE: Before the below step, prepare input for other methods and run them as in the `dataset` directory. 
+
+NOTE: Before the below step, prepare input for other methods according to script (`prepare_other_methods_input.py`) in the `dataset` directory. 
 
 Then run the following script for getting predictions for competing methods. 
 
@@ -49,10 +50,10 @@ python analysis.py
 
 Check all the paths in the constructor before running the script.  
 
-This script parses Disobind/AF2/AF3 predicted outputs for all tasks and all CG values. Following outputs are generated:
+This script parses Disobind/AF2/AF3 outputs for all tasks and all CG values, as well as competing method outputs for interface/CG=1. Following outputs are generated:
 1. OOD set metrics in a CSV file format.
 2. AF2 vs AF3 confidence plot and raw data for the plots. 
 3. Sparsity vs F1 score plot and raw data for the plots. 
-4. Predicted interfaces at CG 1 for case specific analysis in a .txt file.
+4. Predicted interfaces at CG 1 for case specific analysis. Note that we need the input contact maps for the specific case from script (`prepare_entry_from_pdb.py`) in the `dataset` directory.  
    
 
