@@ -32,6 +32,7 @@ The contact maps from AF2/AF3 predicted structures are corrected based on the pL
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
 
 ## Other method predictions
+Prepare input for other methods as in the `dataset` directory. 
 
 Run the following script for getting predictions for competing methods. 
 
