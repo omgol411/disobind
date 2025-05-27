@@ -58,7 +58,7 @@ class Prediction():
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
-		self.mode = "misc"
+		self.mode = "ood"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
@@ -69,6 +69,12 @@ class Prediction():
 
 		# Dict to store Uniprot sequences.
 		self.uniprot_seq = {}
+		# Dict to store binary mask for SLiMs.
+		self.slims_masks = {}
+		# Dict to store binary mask for disorder promoting residues.
+		self.aa_masks = {}
+		# Dict to store ELM motifs for all UniProt IDs.
+		self.motifs_dict = {}
 		# Dict to store disordered residues for all UniProt IDs.
 		self.disorder_dict = {}
 
@@ -89,16 +95,16 @@ class Prediction():
 			self.Uniprot_seq_file =  f"../database/v_{self.data_version}/Uniprot_seq.json"
 			# Test contact maps file name.
 			self.cmaps_file =  f"../database/v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
-		elif self.mode == "peds":
-			self.output_dir = f"Predictions_peds_v_{self.data_version}/"
-			# Filename to store predictions.
-			self.output_filename = "Disobind_Predictions_peds.npy"
-			# Input file containing the prot1/2 headers.
-			self.input_file = f"../database/PEDS/ped_test_input.csv"
-			# Uniprot file name.
-			self.Uniprot_seq_file =  f"../database/PEDS/Uniprot_seq_PEDS.json"
-			# Test contact maps file name.
-			self.cmaps_file =  f"../database/PEDS/ped_test_target.h5"
+		# elif self.mode == "peds":
+		# 	self.output_dir = f"Predictions_peds_v_{self.data_version}/"
+		# 	# Filename to store predictions.
+		# 	self.output_filename = "Disobind_Predictions_peds.npy"
+		# 	# Input file containing the prot1/2 headers.
+		# 	self.input_file = f"../database/PEDS/ped_test_input.csv"
+		# 	# Uniprot file name.
+		# 	self.Uniprot_seq_file =  f"../database/PEDS/Uniprot_seq_PEDS.json"
+		# 	# Test contact maps file name.
+		# 	self.cmaps_file =  f"../database/PEDS/ped_test_target.h5"
 		elif self.mode == "misc":
 			self.output_dir = f"Predictions_misc_v_{self.data_version}/"
 			# Filename to store predictions.
@@ -119,6 +125,7 @@ class Prediction():
 		else:
 			os.makedirs( self.output_dir, exist_ok = True )
 
+
 		# Absolute path to the analysis dir.
 		self.abs_path = os.path.abspath( "./" )
 		# Path fo the FASTA file for prot1/2 sequences.
@@ -128,6 +135,8 @@ class Prediction():
 
 		# Disordered residues dict file path.
 		self.disorder_file_path = f"{self.abs_path}/{self.output_dir}/disorder_dict.json"
+		# Motifs dict file path.
+		self.motifs_file_path = f"{self.abs_path}/{self.output_dir}/motifs.json"
 		# Logs file path.
 		self.logs_file = f"{self.abs_path}/{self.output_dir}/Logs.json"
 
@@ -156,6 +165,16 @@ class Prediction():
 		if os.path.exists( self.disorder_file_path ):
 			with open( self.disorder_file_path, "r" ) as f:
 				self.disorder_dict = json.load( f )
+
+		if not os.path.exists( self.motifs_file_path ):
+			self.get_motifs( headers )
+		else:
+			print( "Loading motifs dict..." )
+			with open( self.motifs_file_path, "r" ) as f:
+				self.motifs_dict = json.load( f )
+
+		self.create_slim_masks( headers )
+		self.create_aa_masks( headers )
 
 		print( "Creating global embeddings for the input sequences..." )
 		self.create_embeddings( headers )
@@ -582,6 +601,235 @@ class Prediction():
 			raise Exception( f"Unrecognized objective {cg}..." )
 
 
+	def get_motifs( self, headers ):
+		"""
+		For all the OOD set entries, get the disordered binding motifs from ELM.
+
+		Input:
+		----------
+		headers --> list of entry_id for a binary complexes.
+
+		Returns:
+		----------
+		None
+		"""
+		print( "Obtaining motifs from ELM..." )
+		for i, head in enumerate( headers ):
+			print( f"Collecting motifs for {i} --> {head}" )
+			head1, head2 = head.split( "--" )
+			head2 = head2.split( "_" )[0]
+			uni_id1, _, _ = head1.split( ":" )
+			uni_id2, _, _ = head2.split( ":" )
+
+			for uni_id in [uni_id1, uni_id2]:
+				if uni_id not in self.motifs_dict.keys():
+					motifs = []
+
+					all_disorder = self.mobidb[self.mobidb["Uniprot ID"].str.contains( uni_id )]
+					# print( all_disorder )
+					lips = all_disorder[all_disorder["Annotation"].str.contains( "curated-lip-priority" )]["Disorder regions"].tolist()
+					lips += all_disorder[all_disorder["Annotation"].str.contains( "homology-lip-priority" )]["Disorder regions"].tolist()
+					lips = ",".join( lips )
+					# mobidb[mobidb["Uniprot ID"].str.contains( id_ )]["Disorder regions"].tolist()
+					# all_motifs = get_motifs_from_elm( uni_id, max_trials = 10, wait_time = 20 )
+					if len( lips ) > 0:
+						all_motifs = consolidate_regions( lips, 1 )
+					else:
+						all_motifs = []
+					print( all_motifs )
+					for m in all_motifs:
+						tmp = list( map( int, np.arange( m[0], m[1] + 1, 1 ) ) )
+						motifs.extend( tmp )
+					self.motifs_dict[uni_id] = motifs
+		
+		with open( self.motifs_file_path, "w" ) as w:
+			json.dump( self.motifs_dict, w )
+
+
+	def create_slim_masks( self, headers ):
+		"""
+		Create binary masks for SLiMs in prot1 and prot2.
+		Disorder promoting residues (doi.org/10.3389/fphy.2019.00010 and 10.4161/idp.24684):
+			Arg, Pro, Gln, Glu, Gly, Ser, Ala, and Lys
+		The binary mask indicates if any of the residue is part of a SLiM motif.
+
+		Inputs:
+		----------
+		headers --> list of entry_id for a binary complexes.
+
+		Returns:
+		----------
+		None
+		"""
+		self.logs["counts"]["slims1"] = 0
+		self.logs["counts"]["slims2"] = 0
+		for head in headers:
+			head1, head2 = head.split( "--" )
+			head2, num = head2.split( "_" )
+			uni_id1, start1, end1 = head1.split( ":" )
+			uni_id2, start2, end2 = head2.split( ":" )
+			start1, end1 = int( start1 ), int( end1 )
+			start2, end2 = int( start2 ), int( end2 )
+
+			p1_pos = np.arange( start1, end1 + 1, 1 )
+			p2_pos = np.arange( start2, end2 + 1, 1 )
+
+			slims1 = self.motifs_dict[uni_id1]
+			slims2 = self.motifs_dict[uni_id2]
+			p1_pos = [int( res in slims1 ) for res in p1_pos]
+			p2_pos = [int( res in slims2 ) for res in p2_pos]
+			
+			pad_p1_pos = np.zeros( ( self.max_len ) )
+			pad_p1_pos[:len( p1_pos )] = p1_pos
+			pad_p2_pos = np.zeros( ( self.max_len ) )
+			pad_p2_pos[:len( p2_pos )] = p2_pos
+
+			self.slims_masks[head] = {}
+			self.slims_masks[head]["prot1"] = pad_p1_pos.reshape( -1, 1 )
+			self.slims_masks[head]["prot2"] = pad_p2_pos.reshape( -1, 1 )
+
+			self.logs["counts"]["slims1"] += np.count_nonzero( pad_p1_pos )
+			self.logs["counts"]["slims2"] += np.count_nonzero( pad_p2_pos )
+
+
+	def get_disorder_promoting_aa_mask( self, seq: str ):
+		"""
+		Create a binary mask for disorder promoting amino acids.
+		Pad it to max_len.
+		"""
+		disorder_promoting_aa = ["R", "P", "Q", "E", "G", "S", "A", "K"]
+		binary_seq = [int( aa in disorder_promoting_aa ) for aa in seq]
+		
+		pad_binary_seq = np.zeros( ( self.max_len ) )
+		pad_binary_seq[:len( seq )] = binary_seq
+		return pad_binary_seq
+
+
+	def get_aromatic_aa_mask( self, seq: str ):
+		"""
+		Create a binary mask for aromatic amino acids.
+		Pad it to max_len.
+		"""
+		aromatic_aa = ["F", "Y", "W"]
+		binary_seq = [int( aa in aromatic_aa ) for aa in seq]
+		
+		pad_binary_seq = np.zeros( ( self.max_len ) )
+		pad_binary_seq[:len( seq )] = binary_seq
+		return pad_binary_seq
+
+
+	def get_hydrophobic_aa_mask( self, seq: str ):
+		"""
+		Create a binary mask for hydrophobic amino acids.
+		Pad it to max_len.
+		"""
+		hydrophobic_aa = ["A", "V", "L", "I", "P", "M", "F", "W"]
+		binary_seq = [int( aa in hydrophobic_aa ) for aa in seq]
+		
+		pad_binary_seq = np.zeros( ( self.max_len ) )
+		pad_binary_seq[:len( seq )] = binary_seq
+		return pad_binary_seq
+
+
+	def get_polar_aa_mask( self, seq: str ):
+		"""
+		Create a binary mask for polar amino acids.
+		Pad it to max_len.
+		"""
+		polar_aa = ["S", "T", "C", "N", "Q", "Y"]
+		binary_seq = [int( aa in polar_aa ) for aa in seq]
+		
+		pad_binary_seq = np.zeros( ( self.max_len ) )
+		pad_binary_seq[:len( seq )] = binary_seq
+		return pad_binary_seq
+
+
+	def create_aa_masks( self, headers ):
+		"""
+		Create binary masks for disorder promoting amino acids in both prot1 and prot2.
+		Disorder promoting residues (doi.org/10.3389/fphy.2019.00010 and 10.4161/idp.24684):
+			Arg, Pro, Gln, Glu, Gly, Ser, Ala, and Lys
+		The binary mask indicates if any of the disorder promoting residue is present in the seq.
+
+		Inputs:
+		----------
+		headers --> list of entry_id for a binary complexes.
+
+		Returns:
+		----------
+		None
+		"""
+		for k in ["disorder_promoting_aa", "aromatic_aa", "hydrophobic_aa", "polar_aa"]:
+			for i in [1, 2]:
+				self.logs["counts"][f"{k}{i}"] = 0
+				# self.logs["counts"][f"{k}1"] = 0
+		# self.logs["counts"]["disorder_promoting_aa1"] = 0
+		# self.logs["counts"]["disorder_promoting_aa2"] = 0
+		for head in headers:
+			head1, head2 = head.split( "--" )
+			head2, num = head2.split( "_" )
+			uni_id1, start1, end1 = head1.split( ":" )
+			uni_id2, start2, end2 = head2.split( ":" )
+			start1, end1 = int( start1 ), int( end1 )
+			start2, end2 = int( start2 ), int( end2 )
+
+			p1_seq = self.uniprot_seq[uni_id1][start1 - 1:end1]
+			p2_seq = self.uniprot_seq[uni_id2][start2 - 1:end2]
+
+			# disorder_promoting_aa = ["R", "P", "Q", "E", "G", "S", "A", "K"]
+			# p1_seq = [int( aa in disorder_promoting_aa ) for aa in p1_seq]
+			# p2_seq = [int( aa in disorder_promoting_aa ) for aa in p2_seq]
+			
+			# pad_p1_seq = np.zeros( ( self.max_len ) )
+			# pad_p1_seq[:len( p1_seq )] = p1_seq
+			# pad_p2_seq = np.zeros( ( self.max_len ) )
+			# pad_p2_seq[:len( p2_seq )] = p2_seq
+
+			# Get binary masks for disorder prooting amino acids.
+			dpaa_p1 = self.get_disorder_promoting_aa_mask( p1_seq )
+			dpaa_p2 = self.get_disorder_promoting_aa_mask( p2_seq )
+
+			aro_p1 = self.get_aromatic_aa_mask( p1_seq )
+			aro_p2 = self.get_aromatic_aa_mask( p2_seq )
+
+			hydropho_p1 = self.get_hydrophobic_aa_mask( p1_seq )
+			hydropho_p2 = self.get_hydrophobic_aa_mask( p2_seq )
+
+			polar_p1 = self.get_polar_aa_mask( p1_seq )
+			polar_p2 = self.get_polar_aa_mask( p2_seq )
+
+			self.aa_masks[head] = {}
+			self.aa_masks[head]["prot1"] = {
+					"disorder_promoting_aa": dpaa_p1.reshape( -1, 1 ),
+					"aromatic_aa": aro_p1.reshape( -1, 1 ),
+					"hydrophobic_aa": hydropho_p1.reshape( -1, 1 ),
+					"polar_aa": polar_p1.reshape( -1, 1 )
+			}
+			self.aa_masks[head]["prot2"] = {
+					"disorder_promoting_aa": dpaa_p2.reshape( -1, 1 ),
+					"aromatic_aa": aro_p2.reshape( -1, 1 ),
+					"hydrophobic_aa": hydropho_p2.reshape( -1, 1 ),
+					"polar_aa": polar_p2.reshape( -1, 1 )
+			}
+			# self.aa_masks[head]["prot1"] = {"disorder_promoting": dpaa_p1.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot2"] = {"disorder_promoting": dpaa_p2.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot1"] = {"aromatic": aro_p1.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot2"] = {"aromatic": aro_p2.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot1"] = {"hydrophobic": hydropho_p1.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot2"] = {"hydrophobic": hydropho_p2.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot1"] = {"polar": polar_p1.reshape( -1, 1 )}
+			# self.aa_masks[head]["prot2"] = {"polar": polar_p2.reshape( -1, 1 )}
+
+			self.logs["counts"]["disorder_promoting_aa1"] += np.count_nonzero( dpaa_p1 )
+			self.logs["counts"]["disorder_promoting_aa2"] += np.count_nonzero( dpaa_p2 )
+			self.logs["counts"]["aromatic_aa1"] += np.count_nonzero( aro_p1 )
+			self.logs["counts"]["aromatic_aa2"] += np.count_nonzero( aro_p2 )
+			self.logs["counts"]["hydrophobic_aa1"] += np.count_nonzero( hydropho_p1 )
+			self.logs["counts"]["hydrophobic_aa2"] += np.count_nonzero( hydropho_p2 )
+			self.logs["counts"]["polar_aa1"] += np.count_nonzero( polar_p1 )
+			self.logs["counts"]["polar_aa2"] += np.count_nonzero( polar_p2 )
+
+
 	def predict( self ):
 		"""
 		Predict cmap for the input protein pair from all models.
@@ -651,7 +899,11 @@ class Prediction():
 													"masks": target_mask,
 													"disorder_mat1": disorder_mat1,
 													"disorder_mat2": disorder_mat2,
-													"order_mat": order_mat
+													"order_mat": order_mat,
+													"prot1_aa_mask": self.aa_masks[entry_id]["prot1"],
+													"prot2_aa_mask": self.aa_masks[entry_id]["prot2"],
+													"prot1_slims_mask": self.slims_masks[entry_id]["prot1"],
+													"prot2_slims_mask": self.slims_masks[entry_id]["prot2"]
 														}
 
 					print( f"{idx} ------------------------------------------------------------\n" )
