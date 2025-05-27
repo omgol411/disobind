@@ -28,7 +28,7 @@ class JudgementDay():
 		# Cutoff to dfine contact for disobind predictions.
 		self.contact_threshold = 0.5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.75
+		self.iptm_cutoff = 0.0
 		# Max prot1/2 lengths.
 		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
@@ -430,7 +430,8 @@ class JudgementDay():
 				obj, cg = task.split( "_" )
 				metrics = self.calculate_metrics( pred = preds_dict[key].to( self.device ), 
 													target = torch.from_numpy( ood_dict["targets"] ).to( self.device ), 
-													multidim_avg = "global" )
+													multidim_avg = "global",
+													contact_threshold = self.contact_threshold )
 				results_dict["Objective"].append( obj.title() )
 				results_dict["CG"].append( cg )
 				results_dict["Model"].append( key )
@@ -443,11 +444,9 @@ class JudgementDay():
 					self.eval_other_methods( preds_dict["Disobind_uncal"], preds_dict["Aiupred"],
 											preds_dict["Deepdisobind"], preds_dict["Morfchibi"],
 											torch.from_numpy( ood_dict["targets"] ) )
-				# Create contact density vs interface 1 prediction plots.
+				# Case specific analysis for interface 1 prediction.
 				self.case_specific_analysis( entry_ids, preds_dict, ood_dict["targets"] )
-											# preds_dict["Disobind_uncal"], 
-											# preds_dict["AF2_pLDDT_PAE"], 
-											# ood_dict["targets"] )
+
 
 			# Just adding a empty row for separating different tasks.
 			for key in results_dict.keys():
@@ -541,16 +540,20 @@ class JudgementDay():
 
 		diso_metrics = self.calculate_metrics( pred = diso_p1,
 													target = target_p1,
-													multidim_avg = "global" )
+													multidim_avg = "global",
+													contact_threshold = self.contact_threshold )
 		aiupred_metrics = self.calculate_metrics( pred = aiupred_p1,
 													target = target_p1,
-													multidim_avg = "global" )
+													multidim_avg = "global",
+													contact_threshold = self.contact_threshold )
 		deepdisobind_metrics = self.calculate_metrics( pred = deepdisobind_p1,
 														target = target_p1,
-														multidim_avg = "global" )
+														multidim_avg = "global",
+														contact_threshold = self.contact_threshold )
 		morfchibi_metrics = self.calculate_metrics( pred = morfchibi_p1,
 													target = target_p1,
-													multidim_avg = "global" )
+													multidim_avg = "global",
+													contact_threshold = 0.775 )
 
 
 		df = pd.DataFrame()
@@ -559,117 +562,6 @@ class JudgementDay():
 		df["Precision"] = [diso_metrics[1], aiupred_metrics[1], deepdisobind_metrics[1], morfchibi_metrics[1]]
 		df["F1-score"] = [diso_metrics[2], aiupred_metrics[2], deepdisobind_metrics[2], morfchibi_metrics[2]]
 		df.to_csv( self.other_methods_result_file, index = False )
-
-
-	def eval_single( self ):
-		"""
-		Calculate metric for performance for a specific model.
-		"""
-		print( "Evaluation for PEDS..." )
-		results_dict = {key:[] for key in ["Objective", "CG", "Recall",
-												"Precision", "F1-score"]}
-		for task in self.get_tasks():
-			print( f"Task {task}..." )
-			preds, targets = [], []
-
-			for entry_id in self.target_cmap:
-				# # Ignoring this entry, as AF2-multimer crashed for this.
-				# if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
-				# 	continue
-
-				u1, u2 = entry_id.split( "--" )
-				u1 = u1.split( ":" )[0]
-				u2, c = u2.split( "_" )
-				u2 = u2.split( ":" )[0]
-
-				# # These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
-				# # 	Ignoring these from evaluation (v_19 dataset).
-				# if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-				# 						"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
-				# 						"O85041--O85043_0", "P25024--P10145_0"]:
-				# 	continue
-
-				# # v_19 OOD not in v_221 and v_23 train.
-				# if entry_id not in ['Q9UIF9:597:650--Q9UIF9:544:596_0', 'P84092:144:219--Q0JRZ9:318:341_0', 'P07101:128:184--P07101:128:184_6',
-				# 			'Q9NPI8:162:215--Q00597:119:177_0', 'P43405:71:134--P43405:204:269_9', 'P25685:199:221--Q9Y266:102:128_0',
-				# 			'Q96RI1:258:314--Q96RI1:258:314_0', 'Q9Y618:2334:2354--P37231:299:367_0', 'P07101:109:160--P07101:109:160_1',
-				# 			'Q8WUM0:1089:1156--Q8WUM0:546:613_1', 'P53041:85:151--P08238:640:692_0', 'P0AFD6:1:90--P33602:680:735_4',
-				# 			'P49789:61:147--P49789:55:108_1', 'Q99ZW2:1034:1088--P68398:77:160_0', 'P0AG30:315:366--P0AG30:315:366_14',
-				# 			'P84092:68:135--P63010:513:584_21', 'Q16236:506:559--O15525:23:122_0', 'Q8AVI7:3:74--Q6GP41:2:79_0',
-				# 			'B7UM94:22:106--B7UM94:22:106_4', 'P04273:95:193--P04273:95:193_0', 'P37840:69:97--P37840:38:67_9',
-				# 			'P03317:2007:2069--P03317:2431:2505_4', 'Q02199:371:470--P48837:502:540_4', 'A0A5F9CI80:2:74--G1STG2:65:139_0',
-				# 			'Q07666:143:201--Q07666:143:201_0', 'P01861:118:146--P55899:93:158_1', 'Q92800:80:164--O75530:77:167_0']:
-				# 	continue
-
-				# # v_21 OOD not in v_23 train.
-				# if entry_id not in ['P37840:69:97--P37840:38:67_5', 'Q96EP0:966:1070--Q96EP0:867:959_3', 'P49366:8:185--P49366:10:78_0',
-				# 				'P25685:199:221--Q9Y266:102:128_0', 'P51946:1:38--P51948:244:308_0', 'P84092:144:219--Q0JRZ9:318:341_0',
-				# 				'B7UM94:19:192--B7UM94:19:192_0', 'Q92800:80:164--O75530:77:258_0', 'P55011:216:250--P55011:1022:1212_2',
-				# 				'P03317:2007:2069--P03317:2358:2505_2', 'P04273:95:193--P04273:95:193_0', 'P37231:231:367--Q9Y618:2334:2354_0',
-				# 				'P28307:41:151--P28307:41:151_0', 'Q9HBM1:80:224--Q8NBT2:86:197_0', 'Q16543:102:137--A0A7E5VSK5:267:371_1',
-				# 				'P56211:86:112--P63151:8:60_0', 'P06179:1:39--Q9R016:773:898_2', 'A0A6H1PJZ3:263:441--A0A6H1PJZ3:854:1000_4']:
-				# 	continue
-
-				# # "2n3a"
-				# if f"{u1}--{u2}_{c}" not in ["Q7Z3K3--O75475_0"]:
-				# 	continue
-				# # "2dt7"
-				# if f"{u1}--{u2}_{c}" not in ["Q12874--Q15459_0"]:
-				# 	continue
-				# # 2jwn
-				# if f"{u1}--{u2}_{c}" not in ["Q6TY21--Q6TY21_0"]:
-				# 	continue
-				# # 2mkr
-				# if f"{u1}--{u2}_{c}" not in ["P32776--P12978_0"]:
-				# 	continue
-
-				# # "2lmq"
-				# if f"{u1}--{u2}_{c}" not in ["P05067--P05067_0"]:
-				# 	continue
-				# # "8cmk"
-				# if f"{u1}--{u2}_{c}" not in ["Q9Y5L0--Q14011_0"]:
-				# 	continue
-				# # 2mwy
-				# if f"{u1}--{u2}_{c}" not in ["O15151--P04637_0"]:
-				# 	continue
-				# # 2kqs
-				# if f"{u1}--{u2}_{c}" not in ["P63165--Q9UER7_0"]:
-				# 	continue
-				# 5xv8
-				if f"{u1}--{u2}_{c}" not in ["Q2YD98--P32780_0"]:
-					continue
-
-				# # 7lna
-				# if f"{u1}--{u2}_{c}" not in ["P04273--P04273_0"]:
-				# 	continue
-				# # 6xmn
-				# if f"{u1}--{u2}_{c}" not in ["P10145--P25024_0"]:
-				# 	continue
-				target = self.target_cmap[entry_id]
-				target = np.array( self.target_cmap[entry_id] )
-				target = self.prepare_target( target, task )
-
-				# PEDS predictions have the same organization as the OOD set predictions.
-				preds.append( np.array( self.disobind_preds[entry_id][task]["Disobind_uncal"] ) )
-				targets.append( target )
-
-			preds = torch.from_numpy( np.stack( preds ) )
-			targets = torch.from_numpy( np.stack( targets ) )
-
-			obj, cg = task.split( "_" )
-
-			metrics = self.calculate_metrics( pred = preds.to( self.device ),
-												target = targets.to( self.device ),
-												multidim_avg = "global" )
-
-			results_dict["Objective"].append( obj.title() )
-			results_dict["CG"].append( cg )
-			results_dict["Recall"].append( metrics[0] )
-			results_dict["Precision"].append( metrics[1] )
-			results_dict["F1-score"].append( metrics[2] )
-
-		df = pd.DataFrame( results_dict )
-		df.to_csv( f"{self.output_dir}Results_Disobind_only.csv", index = False )
 
 
 	def count_confident_AF_predictions( self ):
@@ -700,12 +592,6 @@ class JudgementDay():
 			u2, c = u2.split( "_" )
 			u2 = u2.split( ":" )[0]
 
-			# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
-			# 	Ignoring these from evaluation.
-			if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-									"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0", "O85041--O85043_0", "P25024--P10145_0"]:
-				continue
-
 			selected_entries.append( key )
 			af2_score.append( self.af2m_preds[key]["scores"][0] )
 			af3_score.append( self.af3_preds[key]["scores"][0] )
@@ -723,8 +609,6 @@ class JudgementDay():
 			if af2_score[-1] >= af3_score[-1]:
 				counts6 += 1
 
-		# print( counts1, "  ", counts2, "  ",counts3, "  ", counts4, "  ", counts5, "  ", counts6 )
-		# exit()
 		plt.plot( [0, 1], [0, 1], color = "gray" )
 		plt.scatter( af2_score, af3_score )
 		plt.axvline( self.iptm_cutoff, color = "red" )
@@ -788,7 +672,7 @@ class JudgementDay():
 
 
 
-	def calculate_metrics( self, pred, target, multidim_avg ):
+	def calculate_metrics( self, pred, target, multidim_avg, contact_threshold ):
 		"""
 		Calculate the following metrics:
 			Recall, Precision, F1score, AvgPrecision, MCC, AUROC, Accuracy.
@@ -804,7 +688,7 @@ class JudgementDay():
 		metric_array --> np.array containing the calculated metric values in order:
 			Recall, Precision, F1score, AvgPrecision, MCC, AUROC, Accuracy.	
 		"""
-		metrics = torch_metrics( pred, target, self.contact_threshold, multidim_avg, self.device )
+		metrics = torch_metrics( pred, target, contact_threshold, multidim_avg, self.device )
 		metric_array = np.array( [
 					metrics[0].item(),
 					metrics[1].item(),
