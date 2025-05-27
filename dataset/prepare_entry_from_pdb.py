@@ -17,7 +17,7 @@ from from_APIs_with_love import ( send_request, from_pdb_rest_api_with_love,
 from utility import ( load_PDB, get_coordinates, get_contact_map )
 
 
-class TereNaam():
+class EntryFromPDB():
     """
     Get input sequence pairs and corresponding output contact maps.
     """
@@ -67,8 +67,8 @@ class TereNaam():
         self.contact_threshold = 8
 
 
-    def hamne_kiya_hai( self ):
-        self.jeevan_apna_sara_sanam()
+    def forward( self ):
+        self.create_dirs()
         misc_data = self.get_misc_entries()
         # Get AF2/3 input files.
         self.create_af2_input( misc_data )
@@ -76,7 +76,7 @@ class TereNaam():
         self.save( misc_data )
 
 
-    def jeevan_apna_sara_sanam( self ):
+    def create_dirs( self ):
         """
         Create the required directories if they don't already exist.
         """
@@ -577,5 +577,5 @@ class TereNaam():
 
 ################################################
 if __name__ == "__main__":
-    TereNaam().hamne_kiya_hai()
+    EntryFromPDB().forward()
 
