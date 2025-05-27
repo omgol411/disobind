@@ -51,9 +51,10 @@ python analysis.py
 Check all the paths in the constructor before running the script.  
 
 This script parses Disobind/AF2/AF3 outputs for all tasks and all CG values, as well as competing method outputs for interface/CG=1. Following outputs are generated:
-1. OOD set metrics in a CSV file format.
+1. OOD set metrics in a CSV file format. Including metrics based on type of residue (disordered, ordered, SLiM, aa type: H/P/Aromatic/disorder-promoting)
 2. AF2 vs AF3 confidence plot and raw data for the plots. 
 3. Sparsity vs F1 score plot and raw data for the plots. 
-4. Predicted interfaces at CG 1 for case specific analysis. Note that we need the input contact maps for the specific case from script (`prepare_entry_from_pdb.py`) in the `dataset` directory.  
+4. Predicted interfaces at CG 1 for case specific analysis. Note that we need the input contact maps for the specific case from script (`prepare_entry_from_pdb.py`) in the `dataset` directory.
+
    
 
