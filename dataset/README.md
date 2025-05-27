@@ -32,5 +32,7 @@ python create_input_embeddings.py
 1. Create input sequences to alternate methods. 
 ```prep_other_methods_input.py```
 
-2. Prepare contact maps from the PDB 
+# Case-specific comparisons 
+
+1. Prepare contact maps from the PDB 
 ```prepare_entry_from_pdb.py``` 
