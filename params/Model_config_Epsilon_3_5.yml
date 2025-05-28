@@ -46,6 +46,7 @@ conf:
     activation2:
     - sigmoid
     - true
+    max_seq_len: 100
     device: cuda
     objective:
     - interface_bin
