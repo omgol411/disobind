@@ -136,6 +136,47 @@ class Othermethods():
 		return np.array( preds )
 
 
+	def valid_morf( self, idx: int, interface_array: np.array, cutoff: float ) -> bool:
+		"""
+		Identify if a residue is a valid MORF or not.
+		If <4 consecutive residues have propensity < cutoff,
+			do not consider a MORF.
+		"""
+		for shift in range( 4 ):
+			start = idx - shift
+			end = idx + 4 - shift
+
+			if start < 0 or end > interface_array.shape[0]:
+				continue
+			if np.all( interface_array[start:end] >= cutoff ):
+				return True
+		return False
+
+
+	def process_morfchibi_pred( self, pred_interface: np.array ) -> np.array:
+		"""
+		MORFchibi predictions must be assessed as follows:
+			we suggest a value of 0.775 and that sections under
+			four residues above this cut-off not be identified as MoRFs.
+		For values not within the 4-residue window make them 0.
+			This is to ensure that torch_metric won't consider it a TP at the cutoff value.
+		"""
+		morfchibi_cutoff = 0.775
+		processed_interface = []
+		total = len( pred_interface )
+		for i, prop in enumerate( pred_interface ):
+			if prop >= morfchibi_cutoff:
+				valid = self.valid_morf( idx = i, interface_array = pred_interface, cutoff = morfchibi_cutoff )
+				if valid:
+					processed_interface.append( prop )
+				# If <4 consecutive residues are above cutoff, convert them to 0.
+				else:
+					processed_interface.append( 0 )
+			else:
+				processed_interface.append( prop )
+		return np.array( processed_interface )
+
+
 	def get_morfchibi_predictions( self ) -> Dict[str, np.array]:
 		"""
 		MORFchibi prediction obtained from - https://mc2.msl.ubc.ca/index.xhtml
@@ -150,6 +191,7 @@ class Othermethods():
 			result_file = os.path.join( self.morfchibi_results_dir, f"_{seq_id}.txt" )
 			if os.path.exists( result_file ):
 				prediction = self.parse_morfchibi_output( result_file )
+				prediction = self.process_morfchibi_pred( prediction )
 			else:
 				start1, end1 = list( map( int, seq_id.split( "_" )[1:] ) )
 				prediction = np.zeros( [end1-start1+1] )
@@ -166,31 +208,6 @@ class Othermethods():
 		m = pred.shape[0]
 		pad_mask[:m] = pred
 		return pad_mask
-
-
-	def process_morfchibi_pred( self, pred_interface: np.array ):
-		"""
-		MORFchibi predictions must be assessed as follows:
-			we suggest a value of 0.775 and that sections under
-			four residues above this cut-off not be identified as MoRFs.
-		Here, I replace all propensity values with 0 if <4 consecutive
-			residues are above the cutoff.
-		"""
-		morfchibi_cutoff = 0.775
-		processed_interface = []
-		total = len( pred_interface )
-		for i, prop in enumerate( pred_interface ):
-			if prop >= 0.775:
-				start = i
-				end = i+4 if i+4 <= total else total
-				if all( pred_interface[start:end] >= morfchibi_cutoff ):
-					processed_interface.append( prop )
-				# If <4 consecutive residues are above cutoff, convert them to 0.
-				else:
-					processed_interface.append( 0.0 )
-			else:
-				processed_interface.append( prop )
-		return np.array( processed_interface )
 
 
 	def assemble_interfaces_for_ood_entries( self, aiupred_preds: Dict, deepdiso_preds: Dict,
@@ -218,26 +235,19 @@ class Othermethods():
 					deepdiso_p1 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
 					deepdiso_p2 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
 
-					processed_interface1 = self.process_morfchibi_pred( morfchibi_preds[ood_entry_id][seq_id] )
-					morfchibi_p1 = self.pad_to_max_len( processed_interface1 )
-					processed_interface2 = self.process_morfchibi_pred( morfchibi_preds[ood_entry_id][seq_id] )
-					morfchibi_p2 = self.pad_to_max_len( processed_interface2 )
-					# morfchibi_p2 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+					morfchibi_p1 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+					morfchibi_p2 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
 				# Heteromeric entries.
 				else:
 					if seq_uni_id == ood_uni_id1:
 						aiupred_p1 = self.pad_to_max_len( aiupred_preds[ood_entry_id][seq_id] )
 						deepdiso_p1 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
-						processed_interface1 = self.process_morfchibi_pred( morfchibi_preds[ood_entry_id][seq_id] )
-						morfchibi_p1 = self.pad_to_max_len( processed_interface1 )
-						# morfchibi_p1 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+						morfchibi_p1 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
 
 					elif seq_uni_id == ood_uni_id2:
 						aiupred_p2 = self.pad_to_max_len( aiupred_preds[ood_entry_id][seq_id] )
 						deepdiso_p2 = self.pad_to_max_len( deepdiso_preds[ood_entry_id][seq_id] )
-						processed_interface2 = self.process_morfchibi_pred( morfchibi_preds[ood_entry_id][seq_id] )
-						morfchibi_p2 = self.pad_to_max_len( processed_interface2 )
-						# morfchibi_p2 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
+						morfchibi_p2 = self.pad_to_max_len( morfchibi_preds[ood_entry_id][seq_id] )
 
 					else:
 						raise ValueError( f"Uniprot ID from AIUPred/DeepDisoBind does not match OOD Uniprot ID..." )
