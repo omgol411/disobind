@@ -307,9 +307,7 @@ class IdppiPreds():
 		"""
 		Given Disobind interface_1 predictions, determine
 			if the protein pair interacts or not (PPI task).
-		A protein pair interacts if:
-			1. If any protein for any fragment pair has predicted interfaces.
-			2. If both prot1/2 for any fragment pair has predicted interfaces.
+		Using multiple criterion (test) to determine interaction.
 		"""
 		print( "\nIDPPI analysis..." )
 		output_dict = {k:[] for k in ["test_name", "contact_threshold", "Recall", "Precision",
