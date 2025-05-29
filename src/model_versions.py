@@ -15,8 +15,8 @@ Use the following script to define the model configurations for model training.
     The script generates a version_*.yml file used as input for hparams_search.py script.
 """
 # Version of the dataset used for developing the model.
-dataset_version = 23
-max_len = 250
+dataset_version = 21
+max_len = 200
 # Select from models in src/models/
 model = "Epsilon_3" 
 emb = "T5"             # ["T5", "ProstT5", "ProSE", "BERT"]
@@ -41,7 +41,7 @@ objective is list of 4 elements:
 """
 
 data = {
-    "Version": "13.2",
+    "Version": "14.2",
     "Embedding": f"{emb}",
     "Emb_type": f"{emb_type}",
     "Model": model,
@@ -64,7 +64,7 @@ data = {
             #       interface --> ["avg1d", "avg2d", "lin"]
             #       placement --> ["pre_proj", "post_concat", "post_hid", "post_out"] --> deprecataed
             # "input_layer": ["op-od", "vanilla", ""],     # Uncomment for contact map model training
-            "input_layer": ["op-od", "vanilla", "lin"],  # Uncomment for interface model training
+            "input_layer": ["op-od", "vanilla", "avg2d"],  # Uncomment for interface model training
             # For Monte carlo dropout. #samples to be taken.
             "num_samples": 0,
             # ["#US_layers", "#DS_layers", "num_blocks", "scale_factor", 
@@ -127,7 +127,7 @@ data = {
                 # ["linear", "exp", "multistep", "cycliclr", "swa"]
                 "name": "exp",
                 "milestone": [None],
-                "gamma": [0.93],
+                "gamma": [0.9],
                 "start_factor": None,
                 "end_factor": None,
                 "total_iters": None,
@@ -149,4 +149,5 @@ data = {
     }
 
 OmegaConf.save( config = data, f = "version_{}.yml".format( data["Version"] ) )
+
 
