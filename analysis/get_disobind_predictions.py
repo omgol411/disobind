@@ -58,7 +58,7 @@ class Prediction():
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
-		self.mode = "ood"
+		self.mode = "misc"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
@@ -73,7 +73,7 @@ class Prediction():
 		self.slims_masks = {}
 		# Dict to store binary mask for disorder promoting residues.
 		self.aa_masks = {}
-		# Dict to store ELM motifs for all UniProt IDs.
+		# Dict to store motifs for all UniProt IDs.
 		self.motifs_dict = {}
 		# Dict to store disordered residues for all UniProt IDs.
 		self.disorder_dict = {}
@@ -95,16 +95,7 @@ class Prediction():
 			self.Uniprot_seq_file =  f"../database/v_{self.data_version}/Uniprot_seq.json"
 			# Test contact maps file name.
 			self.cmaps_file =  f"../database/v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
-		# elif self.mode == "peds":
-		# 	self.output_dir = f"Predictions_peds_v_{self.data_version}/"
-		# 	# Filename to store predictions.
-		# 	self.output_filename = "Disobind_Predictions_peds.npy"
-		# 	# Input file containing the prot1/2 headers.
-		# 	self.input_file = f"../database/PEDS/ped_test_input.csv"
-		# 	# Uniprot file name.
-		# 	self.Uniprot_seq_file =  f"../database/PEDS/Uniprot_seq_PEDS.json"
-		# 	# Test contact maps file name.
-		# 	self.cmaps_file =  f"../database/PEDS/ped_test_target.h5"
+
 		elif self.mode == "misc":
 			self.output_dir = f"Predictions_misc_v_{self.data_version}/"
 			# Filename to store predictions.
@@ -116,7 +107,7 @@ class Prediction():
 			# Test contact maps file name.
 			self.cmaps_file =  f"../database/Misc/misc_test_target.h5"
 		else:
-			raise ValueError( "Incorrect mode specified (ood/peds supported)..." )
+			raise ValueError( "Incorrect mode specified (ood/misc supported)..." )
 
 		if os.path.exists( self.output_dir ):
 			reply = input( "Output directory already exists. Abort? (Y/n)\t" )
@@ -603,7 +594,10 @@ class Prediction():
 
 	def get_motifs( self, headers ):
 		"""
-		For all the OOD set entries, get the disordered binding motifs from ELM.
+		Get LIP motifs from MobiDB.
+		Selecting motifs belonging to the following tags:
+			curated-lip-priority
+			homology-lip-priority
 
 		Input:
 		----------
@@ -613,7 +607,7 @@ class Prediction():
 		----------
 		None
 		"""
-		print( "Obtaining motifs from ELM..." )
+		print( "Obtaining motifs from MobiDB..." )
 		for i, head in enumerate( headers ):
 			print( f"Collecting motifs for {i} --> {head}" )
 			head1, head2 = head.split( "--" )
@@ -626,12 +620,9 @@ class Prediction():
 					motifs = []
 
 					all_disorder = self.mobidb[self.mobidb["Uniprot ID"].str.contains( uni_id )]
-					# print( all_disorder )
 					lips = all_disorder[all_disorder["Annotation"].str.contains( "curated-lip-priority" )]["Disorder regions"].tolist()
 					lips += all_disorder[all_disorder["Annotation"].str.contains( "homology-lip-priority" )]["Disorder regions"].tolist()
 					lips = ",".join( lips )
-					# mobidb[mobidb["Uniprot ID"].str.contains( id_ )]["Disorder regions"].tolist()
-					# all_motifs = get_motifs_from_elm( uni_id, max_trials = 10, wait_time = 20 )
 					if len( lips ) > 0:
 						all_motifs = consolidate_regions( lips, 1 )
 					else:
@@ -649,8 +640,6 @@ class Prediction():
 	def create_slim_masks( self, headers ):
 		"""
 		Create binary masks for SLiMs in prot1 and prot2.
-		Disorder promoting residues (doi.org/10.3389/fphy.2019.00010 and 10.4161/idp.24684):
-			Arg, Pro, Gln, Glu, Gly, Ser, Ala, and Lys
 		The binary mask indicates if any of the residue is part of a SLiM motif.
 
 		Inputs:
@@ -695,6 +684,8 @@ class Prediction():
 	def get_disorder_promoting_aa_mask( self, seq: str ):
 		"""
 		Create a binary mask for disorder promoting amino acids.
+		Disorder promoting residues (doi.org/10.3389/fphy.2019.00010 and 10.4161/idp.24684):
+			Arg, Pro, Gln, Glu, Gly, Ser, Ala, and Lys
 		Pad it to max_len.
 		"""
 		disorder_promoting_aa = ["R", "P", "Q", "E", "G", "S", "A", "K"]
@@ -733,10 +724,10 @@ class Prediction():
 
 	def get_polar_aa_mask( self, seq: str ):
 		"""
-		Create a binary mask for polar amino acids.
+		Create a binary mask for polar (incuding charged) amino acids.
 		Pad it to max_len.
 		"""
-		polar_aa = ["S", "T", "C", "N", "Q", "Y"]
+		polar_aa = ["S", "T", "C", "N", "Q", "Y", "D", "E", "K", "R"]
 		binary_seq = [int( aa in polar_aa ) for aa in seq]
 		
 		pad_binary_seq = np.zeros( ( self.max_len ) )
@@ -776,15 +767,6 @@ class Prediction():
 			p1_seq = self.uniprot_seq[uni_id1][start1 - 1:end1]
 			p2_seq = self.uniprot_seq[uni_id2][start2 - 1:end2]
 
-			# disorder_promoting_aa = ["R", "P", "Q", "E", "G", "S", "A", "K"]
-			# p1_seq = [int( aa in disorder_promoting_aa ) for aa in p1_seq]
-			# p2_seq = [int( aa in disorder_promoting_aa ) for aa in p2_seq]
-			
-			# pad_p1_seq = np.zeros( ( self.max_len ) )
-			# pad_p1_seq[:len( p1_seq )] = p1_seq
-			# pad_p2_seq = np.zeros( ( self.max_len ) )
-			# pad_p2_seq[:len( p2_seq )] = p2_seq
-
 			# Get binary masks for disorder prooting amino acids.
 			dpaa_p1 = self.get_disorder_promoting_aa_mask( p1_seq )
 			dpaa_p2 = self.get_disorder_promoting_aa_mask( p2_seq )
@@ -811,14 +793,6 @@ class Prediction():
 					"hydrophobic_aa": hydropho_p2.reshape( -1, 1 ),
 					"polar_aa": polar_p2.reshape( -1, 1 )
 			}
-			# self.aa_masks[head]["prot1"] = {"disorder_promoting": dpaa_p1.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot2"] = {"disorder_promoting": dpaa_p2.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot1"] = {"aromatic": aro_p1.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot2"] = {"aromatic": aro_p2.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot1"] = {"hydrophobic": hydropho_p1.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot2"] = {"hydrophobic": hydropho_p2.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot1"] = {"polar": polar_p1.reshape( -1, 1 )}
-			# self.aa_masks[head]["prot2"] = {"polar": polar_p2.reshape( -1, 1 )}
 
 			self.logs["counts"]["disorder_promoting_aa1"] += np.count_nonzero( dpaa_p1 )
 			self.logs["counts"]["disorder_promoting_aa2"] += np.count_nonzero( dpaa_p2 )
@@ -883,23 +857,23 @@ class Prediction():
 					
 					# get model predictions.
 					with torch.no_grad():
-						uncal_output = model( prot1, prot2 )
+						disobind_output = model( prot1, prot2 )
 						
-						uncal_output = uncal_output*target_mask
-					uncal_output, target = self.extract_model_output( uncal_output, target, eff_len )
+						disobind_output = disobind_output*target_mask
+					disobind_output, target = self.extract_model_output( disobind_output, target, eff_len )
 
 					_, cg = cg.split( "_" )
-					uncal_output = uncal_output.detach().cpu().numpy()
-					target_mask = target_mask.detach().cpu().numpy().reshape( uncal_output.shape )
+					disobind_output = disobind_output.detach().cpu().numpy()
+					target_mask = target_mask.detach().cpu().numpy().reshape( disobind_output.shape )
 
 					disorder_mat1, disorder_mat2, order_mat = self.get_disorder_matrix( entry_id, obj, cg )
 
 					self.predictions[entry_id][f"{obj}_{cg}"] = {
-													"Disobind_uncal": uncal_output,
-													"masks": target_mask,
-													"disorder_mat1": disorder_mat1,
-													"disorder_mat2": disorder_mat2,
-													"order_mat": order_mat,
+													"Disobind": disobind_output,
+													"target_mask": target_mask,
+													"IDR-IDR": disorder_mat1,
+													"IDR-any": disorder_mat2,
+													"order": order_mat,
 													"prot1_aa_mask": self.aa_masks[entry_id]["prot1"],
 													"prot2_aa_mask": self.aa_masks[entry_id]["prot2"],
 													"prot1_slims_mask": self.slims_masks[entry_id]["prot1"],
