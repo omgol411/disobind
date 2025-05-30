@@ -12,13 +12,14 @@ from dataset.utility import ranges
 from src.metrics import torch_metrics
 from src.utils import plot_reliabity_diagram
 
-MAX_LEN_DICT = {19: 100, 21: 200, 23: 250}
+MAX_LEN_DICT = {"ood": {19: 100, 21: 200},
+				"misc": {19: 200, 21: 200}}
 
 class JudgementDay():
 	def __init__( self ):
 		# Dataset version.
-		self.data_version = 21
-		self.model_version = 21
+		self.data_version = 19
+		self.model_version = 19
 		# path for the dataset dir.
 		self.base_path = f"../database/"
 		# Seed for the PRNGs.
@@ -27,12 +28,11 @@ class JudgementDay():
 		self.contact_threshold = 0.5
 		# ipTM cutoff for confident predictions.
 		self.iptm_cutoff = 0.0
-		# Max prot1/2 lengths.
-		self.max_len = MAX_LEN_DICT[self.model_version]
 		self.pad = True
 		self.mode = "misc" # "ood" or "misc"
+		# Max prot1/2 lengths.
+		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
 		self.prec = 2
-
 		self.device = "cuda"
 
 		if self.mode == "ood":
@@ -210,12 +210,23 @@ class JudgementDay():
 				target = np.array( self.target_cmap[entry_id] )
 				target = self.prepare_target( target, task )
 
+				# Ignoring this entry, as AF2-multimer crashed for this.
+				if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+					continue
+
 				u1, u2 = entry_id.split( "--" )
 				u1 = u1.split( ":" )[0]
 				u2, c = u2.split( "_" )
 				u2 = u2.split( ":" )[0]
 
 				entry_ids.append( entry_id )
+
+					# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
+					# 	Ignoring these from evaluation.
+				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
+										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
+										"O85041--O85043_0", "P25024--P10145_0"]:
+					continue
 
 				# For all fields in the prediction dict.
 				for ood_key in ood_dict.keys():

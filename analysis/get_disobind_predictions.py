@@ -36,7 +36,8 @@ In case no Uniprot ID is available for a protein, use the fasta file format.
 	Keep the header as: >Prot1:start1:end1.
 	Provide full protein sequence.
 """
-MAX_LEN_DICT = {19: 100, 21: 200, 23: 250}
+MAX_LEN_DICT = {"ood": {19: 100, 21: 200},
+				"misc": {19: 200, 21: 200}}
 
 class Prediction():
 	def __init__( self ):
@@ -46,19 +47,19 @@ class Prediction():
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
 		# Dataset version.
-		self.data_version = 21
-		self.model_version = 21
+		self.data_version = 19
+		self.model_version = 19
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
 		self.scope = "global"
 		self.device = "cuda" # cpu/cuda.
+		self.mode = "ood"
 		# Max protein length.
-		self.max_len = MAX_LEN_DICT[self.model_version]
+		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
 		# Contact probability threshold.
 		self.threshold = 0.5
 		self.multidim_avg = "global" # global/samplewise/samplewise-none.
-		self.mode = "misc"
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.

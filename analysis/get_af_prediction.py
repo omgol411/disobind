@@ -22,10 +22,13 @@ Create contact maps and calculate metrics values.
 Obtain the pLDDT and PAE too.
 """
 
+MAX_LEN_DICT = {"ood": {19: 100, 21: 200},
+				"misc": {19: 200, 21: 200}}
+
 class AF2MPredictions():
 	def __init__( self ):
 		# Dataset version.
-		self.version = 21
+		self.version = 19
 		# path for the dataset dir.
 		self.base_path = f"../database/v_{self.version}/"
 
@@ -37,23 +40,16 @@ class AF2MPredictions():
 		self.pae_threshold = 5
 		# ipTM cutoff for confident predictions.
 		self.iptm_cutoff = 0.0
+		# Datset type.
+		self.mode = "misc" # "ood" or "misc"
 		# Max prot1/2 lengths.
-		self.max_len = 200
+		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
 		self.pad = True
 		# Resolution of coarse graining.
 		self.coarse_grain_sizes = [1, 5, 10]
 		self.device = "cuda"
 		# AF2 or AF3.
-		self.af_model = "AF2"
-		# OOD/PEDS predictions
-		self.mode = "misc" # "ood" or "peds"
-
-		# if self.af_model == "AF2":
-		# 	# Dir containing AF2M predictions.
-		# 	self.af_test_pred_dir = "AF2_preds"
-		# else:
-		# 	# Dir containing AF3 predictions.
-		# 	self.af_test_pred_dir = "AF3_preds"
+		self.af_model = "AF3"
 
 		if self.mode == "ood":
 			# Dir containing AF2/3 predictions.
@@ -62,14 +58,6 @@ class AF2MPredictions():
 			self.cmap = h5py.File( f"{self.base_path}Target_bcmap_test_v_{self.version}.h5", "r" )		
 			# File to store AF2/3 derived contact maps for OOD set.
 			self.af_pred_dir = f"./AF_preds_v{self.version}/"
-
-		elif self.mode == "peds":
-			# Dir containing AF2/3 predictions.
-			self.af_test_pred_dir = f"{self.af_model}_peds_preds"
-			# OOD set target contact maps.
-			self.cmap = h5py.File( f"../database/PEDS/ped_test_target.h5", "r" )
-			# File to store AF2/3 derived contact maps for OOD set.
-			self.af_pred_dir = f"./AF_peds_preds_v{self.version}/"
 
 		elif self.mode == "misc":
 			# Dir containing AF2/3 predictions.
