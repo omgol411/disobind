@@ -16,10 +16,11 @@ class Othermethods():
 	"""
 	def __init__( self ):
 		self.input_dir = "../database/other_methods"
-		self.morfchibi_results_dir = os.path.join( self.input_dir, "morf_chibi_results" )
+		self.deepdiso_results_dir = os.path.join( self.input_dir, "deepdiso_results" )
+		self.morfchibi_results_dir = os.path.join( self.input_dir, "morfchibi_results" )
 		self.output_dir = "./other_methods/"
 
-		self.max_len = 200
+		self.max_len = 100
 
 		# Prefix for all DeepDisoBind result files.
 		self.deepdiso_preds_prefix = "deepdisobind_fasta"
@@ -102,8 +103,8 @@ class Othermethods():
 		"""
 		deepdiso_preds = {}
 		print( "\n--> Obtaining DeepDisoBind predictions..." )
-		for suffix in ["0-20", "20-40", "40-59"]:
-			file_path = os.path.join( self.input_dir, f"result_deepdiso_{suffix}.fasta" )
+		for suffix in ["0-20", "20-40", "40-60", "60-80", "80-100", "100-107"]:
+			file_path = os.path.join( self.deepdiso_results_dir, f"result_deepdiso_{suffix}.fasta" )
 
 			with open(file_path, 'r') as f:
 				for record in SeqIO.parse( f, "fasta" ):
