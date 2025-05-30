@@ -16,10 +16,11 @@ class CreateInput():
     """
     def __init__(self):
         self.base_dir = "../database/"
+        self.data_version = 19
         self.meth_dir = os.path.join( self.base_dir, "other_methods/" )
 
-        self.ood_csv_file = os.path.join( self.base_dir, "v_21/prot_1-2_test_v_21.csv" )
-        self.uni_seq_file = os.path.join( self.base_dir, "v_21/Uniprot_seq.json" )
+        self.ood_csv_file = os.path.join( self.base_dir, f"v_{self.data_version}/prot_1-2_test_v_{self.data_version}.csv" )
+        self.uni_seq_file = os.path.join( self.base_dir, f"v_{self.data_version}/Uniprot_seq.json" )
         self.deepdiso_fasta_file = os.path.join( self.meth_dir, "deepdisobind_fasta" )
         self.aiupred_input_file = os.path.join( self.meth_dir, "aiupred_input.json" )
         self.morfchibi_fasta_file = os.path.join( self.meth_dir, "morfchibi_fasta.fasta" )
