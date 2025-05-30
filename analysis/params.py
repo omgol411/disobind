@@ -93,23 +93,23 @@ def get_inteface_params_dict( model_version: int ) -> Dict:
 		interface_param = {
 			# v_21 params -------------
 			"cg_1": [
-				# "Epsilon_3_14",
-				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0003_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.98__0"
-				"Epsilon_3_11.1",
-				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.95__0"
+				"Epsilon_3_14",
+				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0003_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.98__0"
+				# "Epsilon_3_11.1",
+				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.95__0"
 				
 			],
 			"cg_5": [
-				# "Epsilon_3_14.1",
-				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.94__0"
-				"Epsilon_3_11.3",
-				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.92__0"
+				"Epsilon_3_14.1",
+				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.94__0"
+				# "Epsilon_3_11.3",
+				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.92__0"
 			],
 			"cg_10": [
-				# "Epsilon_3_14.2",
-				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.9__0"
-				"Epsilon_3_11.4",
-				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.89__0"
+				"Epsilon_3_14.2",
+				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.9__0"
+				# "Epsilon_3_11.4",
+				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.89__0"
 			]
 		}
 	elif model_version == 19:
@@ -117,16 +117,22 @@ def get_inteface_params_dict( model_version: int ) -> Dict:
 		interface_param = {
 			# v_19 params -------------
 			"cg_1": [
-				"Epsilon_3_5.2",
+				"Epsilon_3_15",
 				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.98__0"
+				# "Epsilon_3_5.2",
+				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.98__0"
 			],
 			"cg_5": [
-				"Epsilon_3_5.1",
-				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.94__0"
+				"Epsilon_3_15.1",
+				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.91__0"
+				# "Epsilon_3_5.1",
+				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.94__0"
 			],
 			"cg_10": [
-				"Epsilon_3_5",
-				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.93__0"
+				"Epsilon_3_15.2",
+				"model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0002_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.88__0"
+				# "Epsilon_3_5",
+				# "model_global-[128, 'ln2', True, 1, '']_[0, 0, 0, 0, 'vanilla', '']_['elu', None]_0.0001_0.5_[0.9, 3]_[0.2, 0, 0, 0, 0]_0.05_0.93__0"
 			]
 		}
 	else:
