@@ -155,6 +155,9 @@ def prepare_input( prot1, prot2, target, target_mask, objective, bin_size, bin_i
 	else:
 		eff_len = max_len
 
+	# For masking pads in the interaction_tensor in model.
+	interaction_mask = target_mask.clone().unsqueeze( -1 )
+
 	if "interaction" in objective:
 		# target: ( N, L1, L2 ) --> ( N, L1xL2 )
 		if target != None:
@@ -199,7 +202,7 @@ def prepare_input( prot1, prot2, target, target_mask, objective, bin_size, bin_i
 		prot1 = torch.from_numpy( prot1 )
 		prot2 = torch.tile( prot2, ( eff_len[0], 1 ) )
 
-	return prot1, prot2, target, target_mask
+	return prot1, prot2, target, target_mask, interaction_mask
 
 
 

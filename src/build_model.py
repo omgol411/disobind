@@ -135,7 +135,8 @@ class Trainer (nn.Module):
 		else:
 			raise Exception( "Incorrect embedding used..." )
 
-		p1_emb, p2_emb, target, target_mask = prepare_input( prot1 = p1_emb, prot2 = p2_emb, target = target, 
+		( p1_emb, p2_emb, target,
+			target_mask, interaction_mask ) = prepare_input( prot1 = p1_emb, prot2 = p2_emb, target = target, 
 															target_mask = [self.mask[1], target_mask], 
 															objective = self.objective[0], 
 															bin_size = self.objective[1], 
@@ -146,8 +147,9 @@ class Trainer (nn.Module):
 		p2_emb = p2_emb.to( self.device ).float()
 		target = target.to( self.device ).float()
 		target_mask = target_mask.to( self.device ).float()
+		interaction_mask = interaction_mask.to( self.device ).float()
 
-		return p1_emb, p2_emb, target, target_mask
+		return p1_emb, p2_emb, target, target_mask, interaction_mask
 
 
 
@@ -166,9 +168,9 @@ class Trainer (nn.Module):
 		target --> target for the minibatch.
 		target_mask --> binary mask for ignoring contribution from padding.
 		"""
-		p1_emb, p2_emb, target, target_mask = self.get_inputs( batch )
+		p1_emb, p2_emb, target, target_mask, interaction_mask = self.get_inputs( batch )
 
-		preds = self.model1( p1_emb, p2_emb )
+		preds = self.model1( p1_emb, p2_emb, interaction_mask )
 
 		del p1_emb, p2_emb
 		return preds, target, target_mask
