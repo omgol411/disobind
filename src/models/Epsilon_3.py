@@ -128,7 +128,7 @@ class Epsilon_3( nn.Module ):
 
 
 
-    def forward( self, e1, e2 ):
+    def forward( self, e1, e2, interaction_mask ):
         # Input to projection block.
         z1, z2 = self.projection_block( e1, e2 )
 
@@ -136,7 +136,7 @@ class Epsilon_3( nn.Module ):
         interaction_tensor = self.get_interaction_tensor( z1, z2 )
 
         if "interface" in self.objective[0]:
-            o = self.interface_block( interaction_tensor )
+            o = self.interface_block( interaction_tensor, interaction_mask )
         elif "interaction" in self.objective[0]:
             n, l1, l2, c = interaction_tensor.shape
             o = interaction_tensor.view( n, -1, c )
@@ -178,15 +178,39 @@ class Epsilon_3( nn.Module ):
         return z1, z2
 
 
+    def avg2d( self, interaction_tensor, interaction_mask ):
+        """
+        Given input tensor [N,H,W,C], compute avg2d along H and W to obtain
+            interface tensors:
+            I1 -> [N,H,C] and I2 -> [N,W,C]
+        Ignore the padding elements from mean computation.
+        """
+        eps = 1e-4
+        masked_tensor = interaction_tensor*interaction_mask
 
-    def interface_block( self, interaction_tensor ):
+        total_I1 = torch.sum( interaction_mask, dim = 2 )
+        total_I2 = torch.sum( interaction_mask, dim = 1 )
+
+        sum_I1 = torch.sum( masked_tensor, dim = 2 )
+        sum_I2 = torch.sum( masked_tensor, dim = 1 )
+
+        I1 = sum_I1/( total_I1 + eps )
+        I2 = sum_I2/( total_I2 + eps )
+
+        I = torch.cat( [I1, I2], axis = 1 )
+        return I
+
+
+
+    def interface_block( self, interaction_tensor, interaction_mask ):
         if self.input_layer_params[2] == "avg1d":
             I = torch.mean( interaction_tensor, axis = 2 )
 
         elif self.input_layer_params[2] == "avg2d":
-            I1 = torch.mean( interaction_tensor, axis = 2 )
-            I2 = torch.mean( interaction_tensor, axis = 1 )
-            I = torch.cat( [I1, I2], axis = 1 )
+            # I1 = torch.mean( interaction_tensor, axis = 2 )
+            # I2 = torch.mean( interaction_tensor, axis = 1 )
+            # I = torch.cat( [I1, I2], axis = 1 )
+            I = self.avg2d( interaction_tensor, interaction_mask )
 
         elif self.input_layer_params[2] == "lin":
             I1 = torch.permute( interaction_tensor, ( 0, 3, 1, 2 ) )
@@ -199,7 +223,6 @@ class Epsilon_3( nn.Module ):
             
             I = torch.cat( [I1, I2], axis = 1 )
         return I
-
 
 
     def capture_interaction( self, z1, z2, aggregate ):
@@ -317,7 +340,6 @@ class Epsilon_3( nn.Module ):
         Output block for the neural network.
             returns logits or the sigmoid output as specified.
         """
-
         logit = self.contact( o )
 
         if self.temperature != None:
