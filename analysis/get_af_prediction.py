@@ -39,11 +39,11 @@ class AF2MPredictions():
 		# PAE cutoff for confident predictions.
 		self.pae_threshold = 5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.0
+		self.iptm_cutoff = 0.75
 		# Datset type.
-		self.mode = "misc" # "ood" or "misc"
+		self.mode = "ood" # "ood" or "misc"
 		# Max prot1/2 lengths.
-		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
+		self.max_len = MAX_LEN_DICT[self.mode][self.version]
 		self.pad = True
 		# Resolution of coarse graining.
 		self.coarse_grain_sizes = [1, 5, 10]
