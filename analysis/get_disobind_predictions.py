@@ -47,14 +47,14 @@ class Prediction():
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
 		# Dataset version.
-		self.data_version = 19
-		self.model_version = 19
+		self.data_version = 21
+		self.model_version = 21
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
 		self.scope = "global"
 		self.device = "cuda" # cpu/cuda.
-		self.mode = "ood"
+		self.mode = "misc"
 		# Max protein length.
 		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
 		# Contact probability threshold.
@@ -407,7 +407,8 @@ class Prediction():
 		prot1 = torch.from_numpy( prot1 ).unsqueeze( 0 )
 		prot2 = torch.from_numpy( prot2 ).unsqueeze( 0 )
 
-		prot1, prot2, target, target_mask = prepare_input( prot1, prot2, target, 
+		( prot1, prot2, target,
+			target_mask, interaction_mask ) = prepare_input( prot1, prot2, target, 
 															[True, target_mask], 
 															objective = self.objective[0], 
 															bin_size = self.objective[1], 
@@ -415,9 +416,10 @@ class Prediction():
 															single_output = self.objective[3] )
 		prot1 = prot1.to( self.device ).float()
 		prot2 = prot2.to( self.device ).float()
-		target_mask = target_mask.to( self.device )
+		target_mask = target_mask.to( self.device ).float()
+		interaction_mask = interaction_mask.to( self.device ).float()
 
-		return prot1, prot2, target, target_mask, eff_len
+		return prot1, prot2, target, target_mask, interaction_mask, eff_len
 
 
 
@@ -853,12 +855,13 @@ class Prediction():
 					model = self.apply_settings( obj, cg )
 
 					( prot1, prot2, target,
-						target_mask, eff_len ) = self.get_input_tensors( entry_id, prot1_emb,
-																		prot2_emb, target_cmap )
+						target_mask, interaction_mask,
+						eff_len ) = self.get_input_tensors( entry_id, prot1_emb,
+															prot2_emb, target_cmap )
 					
 					# get model predictions.
 					with torch.no_grad():
-						disobind_output = model( prot1, prot2 )
+						disobind_output = model( prot1, prot2, interaction_mask )
 						
 						disobind_output = disobind_output*target_mask
 					disobind_output, target = self.extract_model_output( disobind_output, target, eff_len )
