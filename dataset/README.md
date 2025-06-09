@@ -33,6 +33,13 @@ Create input sequences to alternate methods (AIUPred, MORFchibi, DeepDISOBind).
 prep_other_methods_input.py
 ```
 
+# IDPPI dataset input for Disobind
+We used the [IDPPI](https://doi.org/10.1038/s41598-018-28815-x) dataset for assessing Disobind on the PPI prediction task.
+Use the following script to create input for running Disobind on the IDPPI dataset:
+```
+python prep_idppi_input2.py
+```
+
 # Case-specific comparisons 
 
 Prepare contact maps from the PDB.
