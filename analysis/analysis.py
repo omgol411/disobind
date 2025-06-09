@@ -1,3 +1,7 @@
+"""
+Evaluate Disobind, AF2, AF3 on the OOD test set and Misc dataset.
+Also assess the performance of AIUPred, MORFchibi, and DeepDISOBind.
+"""
 import os, random, json, h5py
 from typing import List, Tuple, Dict, Iterator
 import numpy as np
@@ -12,8 +16,7 @@ from dataset.utility import ranges
 from src.metrics import torch_metrics
 from src.utils import plot_reliabity_diagram
 
-MAX_LEN_DICT = {"ood": {19: 100, 21: 200},
-				"misc": {19: 200, 21: 200}}
+MAX_LEN_DICT = {"ood": {19: 100}, "misc": {19: 200}}
 
 class JudgementDay():
 	def __init__( self ):
@@ -351,7 +354,7 @@ class JudgementDay():
 		interactions_dict = {}
 		target = ood_dict["targets"]
 		for interaction_name in ["IDR-IDR", "order"]:
-			for model_key in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2", "Disobind_AF3"]:
+			for model_key in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2"]:
 				if model_key in ood_dict:
 					preds = ood_dict[model_key]
 				elif model_key in preds_dict:
@@ -378,7 +381,7 @@ class JudgementDay():
 		target = ood_dict["targets"]
 		interaction_types_dict = {}
 		for mask_name in ["disorder_promoting_aa", "aromatic_aa", "hydrophobic_aa", "polar_aa", "slims"]:
-			for model_name in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2", "Disobind_AF3"]:
+			for model_name in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2"]:
 				# if "pLDDT_PAE" in model_name:
 				# 	mod_nm = model_name.split( "_pLDDT_PAE" )[0]
 				# else:
@@ -461,8 +464,8 @@ class JudgementDay():
 			af2_diso = self.combine_diso_af_preds( ood_dict = ood_dict, af_model = "AF2" )
 			preds_dict.update( af2_diso )
 
-			af3_diso = self.combine_diso_af_preds( ood_dict = ood_dict, af_model = "AF3" )
-			preds_dict.update( af3_diso )
+			# af3_diso = self.combine_diso_af_preds( ood_dict = ood_dict, af_model = "AF3" )
+			# preds_dict.update( af3_diso )
 
 			if task in ["interaction_1", "interface_1"]:
 				interactions_dict = self.get_preds_for_disorder_order_residues( ood_dict = ood_dict,
@@ -526,7 +529,7 @@ class JudgementDay():
 
 		entries = np.array( entries )
 		metrics_dict = {}
-		for model_key in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2", "Disobind_AF3"]:
+		for model_key in ["Disobind", "AF2_pLDDT_PAE", "Disobind_AF2"]:
 			metrics_dict[model_key] = {}
 
 			preds = torch.from_numpy( preds_dict[model_key]["pred"] ).float()
@@ -539,10 +542,6 @@ class JudgementDay():
 									device = self.device )
 			met = metrics[2].detach().cpu().numpy()
 			metrics_dict[model_key]["F1"] = np.round( met, self.prec )
-			# for i, met_name in enumerate( ["Recall", "Precision", "F1score"] ):
-			# 	met = metrics[i].detach().cpu().numpy()
-			# 	met = np.round( met, self.prec )
-			# 	metrics_dict[model_key][met_name] = met
 
 		# Save samplewsie metrics on OOD set.
 		df = pd.DataFrame()
@@ -556,13 +555,10 @@ class JudgementDay():
 
 		misc_dict = {}
 		af2_diso = preds_dict["Disobind_AF2"]["pred"].copy()
-		af3_diso = preds_dict["Disobind_AF3"]["pred"].copy()
-		# Target is the same for both.
-		target = preds_dict["Disobind_AF3"]["target"].copy()
+		target = preds_dict["Disobind_AF2"]["target"].copy()
 		for i, entry_id in enumerate( entries ):
 			misc_dict[entry_id] = {}
 			misc_dict[entry_id]["AF2+Diso"] = list( af2_diso[i].reshape( -1 ) )
-			misc_dict[entry_id]["AF3+Diso"] = list( af3_diso[i].reshape( -1 ) )
 			misc_dict[entry_id]["Target"] = list( target[i].astype( float ).reshape( -1 ) )
 		with open( self.misc_dict_file, "w" ) as w:
 			json.dump( misc_dict, w )
