@@ -28,15 +28,14 @@ python create_input_embeddings.py
 
 # Comparison to competing methods 
 
-1. Create input sequences to alternate methods (AIUPred, MORFchibi, DeepDISOBind).  
+Create input sequences to alternate methods (AIUPred, MORFchibi, DeepDISOBind).  
 ```
 prep_other_methods_input.py
 ```
 
-
 # Case-specific comparisons 
 
-1. Prepare contact maps from the PDB.
+Prepare contact maps from the PDB.
 Use this script to create input files (entry_ids and contact maps) compatible with Disobind.  
 This script was used to create the Misc dataset in Disobind.
 ```
