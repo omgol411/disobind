@@ -16,7 +16,6 @@ python 2_create_database_dataset_files.py -c 250
 python 3_create_merged_binary_complexes.py -c 200
 ```
 
-
 4. Create training and OOD test set.
 ```
 python 4_create_non_redundant_dataset.py -c 100
@@ -29,8 +28,11 @@ python create_input_embeddings.py
 
 # Comparison to competing methods 
 
-1. Create input sequences to alternate methods. 
-```prep_other_methods_input.py```
+1. Create input sequences to alternate methods (AIUPred, MORFchibi, DeepDISOBind).  
+```
+prep_other_methods_input.py
+```
+
 
 # Case-specific comparisons 
 
