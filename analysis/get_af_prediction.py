@@ -1,29 +1,29 @@
+"""
+Assuming predictions from AF2 and AF3 already exist, obtain contact maps
+	and interface residues across all CG (1, 5, 10) for evaluation with Disobind.
+Select confidently predicted interactions based on pLDDT and PAE.
+
+Used for OOD test and Misc dataset.
+"""
+import os, josn, pickle as pkl
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
 import torch
 from torch import nn
 import Bio
 from Bio.PDB import PDBParser, MMCIFParser
-import json
-import pickle as pkl
 import h5py
+
 from src.metrics import torch_metrics
 from dataset.utility import get_contact_map
 
 import warnings
 warnings.filterwarnings("ignore")
 
-"""
-Obtain AF2M predictions on the <20% test set.
-Create contact maps and calculate metrics values.
-Obtain the pLDDT and PAE too.
-"""
 
-MAX_LEN_DICT = {"ood": {19: 100, 21: 200},
-				"misc": {19: 200, 21: 200}}
+MAX_LEN_DICT = {"ood": {19: 100}, "misc": {19: 200}}
 
 class AF2MPredictions():
 	def __init__( self ):
