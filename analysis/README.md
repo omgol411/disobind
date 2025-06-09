@@ -31,7 +31,7 @@ Check all the paths in the constructor before running the script.
 
 The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3.  
-**NOTE:** For AF3, to use the contact probabilities for obtaining residue-level contact maps set `self.use_af3_struct = True in the constructor`.  
+**NOTE:** For AF3, to use the contact probabilities for obtaining residue-level contact maps set `self.use_af3_struct = True` in the constructor.  
 
 ## Other method predictions
 
