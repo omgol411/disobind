@@ -31,11 +31,11 @@ Check all the paths in the constructor before running the script.
 
 The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
-*NOTE:* For AF3, to use the contact probabilities for obtaining residue-level contact maps set `self.use_af3_struct = True in the constructor`.  
+**NOTE:** For AF3, to use the contact probabilities for obtaining residue-level contact maps set `self.use_af3_struct = True in the constructor`.  
 
 ## Other method predictions
 
-*NOTE:* Before the below step, prepare input for other methods according to script (`dataset/prepare_other_methods_input.py`).  
+**NOTE:** Before the below step, prepare input for other methods according to script (`dataset/prepare_other_methods_input.py`).  
 
 Then run the following script for getting predictions for competing methods. 
 
@@ -50,8 +50,7 @@ Run the following script on the terminal (for all methods).
 python analysis.py
 ```
 
-Check all the paths in the constructor before running the script.  
-
+Check all the paths in the constructor before running the script.
 This script parses Disobind/AF2/AF3 outputs for all tasks and all CG values, as well as competing method outputs for interface/CG=1. Following outputs are generated:
 For both the OOD test set and Misc dataset it outputs:  
 1. Evaluation metrics for all tasks in a Results_*.csv file. 
@@ -59,8 +58,8 @@ For both the OOD test set and Misc dataset it outputs:
 3. Sparsity vs F1 score plot and raw data for the plots.  
 
 
-Additionally, for the Midc dataset it outputs:  
+Additionally, for the Midc dataset it outputs:
 1. Disobind+AF2 Predicted and the corresponding target interfaces at CG 1 in a .json file.
-2. F1-score for Disobind, AF2, and Disobind+AF2 for each entry in the datset.
-*NOTE:* We need the input contact maps for the specific cases from script (`dataset/prepare_entry_from_pdb.py`).
+2. F1-score for Disobind, AF2, and Disobind+AF2 for each entry in the datset.  
+**NOTE:** We need the input contact maps for the specific cases from script (`dataset/prepare_entry_from_pdb.py`).
 
