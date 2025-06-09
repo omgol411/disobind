@@ -32,6 +32,12 @@ Create input sequences to alternate methods (AIUPred, MORFchibi, DeepDISOBind).
 ```
 prep_other_methods_input.py
 ```
+Use the respective web servers for [MORFchibi](https://gsponerlab.msl.ubc.ca/software/morf_chibi/mc2/) and 
+[DeepDISOBind](https://www.csuligroup.com/DeepDISOBind/) to obtain predictions using the input FASTA files.  
+For AIUPred, clone the Git repo in the disobind directory using:
+```
+git clone https://github.com/doszilab/AIUPred.git
+```
 
 # IDPPI dataset input for Disobind
 We used the [IDPPI](https://doi.org/10.1038/s41598-018-28815-x) dataset for assessing Disobind on the PPI prediction task.
@@ -48,3 +54,4 @@ This script was used to create the Misc dataset in Disobind.
 ```
 prepare_entry_from_pdb.py
 ``` 
+
