@@ -30,7 +30,7 @@ python get_af_prediction.py
 Check all the paths in the constructor before running the script.  
 
 The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
-The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
+The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3.  
 **NOTE:** For AF3, to use the contact probabilities for obtaining residue-level contact maps set `self.use_af3_struct = True in the constructor`.  
 
 ## Other method predictions
@@ -61,5 +61,7 @@ For both the OOD test set and Misc dataset it outputs:
 Additionally, for the Midc dataset it outputs:
 1. Disobind+AF2 Predicted and the corresponding target interfaces at CG 1 in a .json file.
 2. F1-score for Disobind, AF2, and Disobind+AF2 for each entry in the datset.  
+
+
 **NOTE:** We need the input contact maps for the specific cases from script (`dataset/prepare_entry_from_pdb.py`).
 
