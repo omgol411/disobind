@@ -36,5 +36,9 @@ prep_other_methods_input.py
 
 # Case-specific comparisons 
 
-1. Prepare contact maps from the PDB 
-```prepare_entry_from_pdb.py``` 
+1. Prepare contact maps from the PDB.
+Use this script to create input files (entry_ids and contact maps) compatible with Disobind.  
+This script was used to create the Misc dataset in Disobind.
+```
+prepare_entry_from_pdb.py
+``` 
