@@ -1,8 +1,8 @@
 """
-Evaluate Disobind performance on the IDPPI dataset.
+Create Disobind input files for the IDPPI dataset.
 DOI: https://doi.org/10.1038/s41598-018-28815-x
 """
-from typing import List, Dict
+from typing import List, Tuple, Dict
 import os, json
 import numpy as np
 import pandas as pd
@@ -24,15 +24,14 @@ class IdppiInput():
 		self.diso_uni_seq_file = os.path.join( self.base_dir, "v_21/Uniprot_seq.json" )
 
 		self.cores = 100
-		self.max_seq_len = 5000
+		self.max_seq_len = 10000
 		# If True, ignores protein pairs which are present in Disobind dataset.
 		self.remove_diso_seq = True
 		
 		self.uniprot_seq_dict = {}
 		self.logger = {}
 
-		# self.idppi_test_dict_file = os.path.join( self.idppi_output_dir, "idppi_test_dict.json" )
-		# self.unique_uni_ids_file = os.path.join( self.idppi_output_dir, "unique_uniprot_ids.txt" )
+		# .json file containing Uniprot sequences for IDPPI dataset.
 		self.uniprot_seq_file = os.path.join( self.idppi_output_dir, "Uniprot_seq_idppi.json" )
 		# .csv file containing IDPPI entry_ids for Disobind.
 		self.diso_input_file = os.path.join( self.idppi_output_dir, "IDPPI_input_diso.csv" )
@@ -71,13 +70,12 @@ class IdppiInput():
 		os.makedirs( self.idppi_output_dir, exist_ok = True )
 
 
-	def parse_idppi_file( self ):
+	def parse_idppi_file( self ) -> Tuple[Dict, List]:
 		"""
 		Obtain all protein pairs and the corresponding labels from the 5 IDPPI Test sets.
 		Obtain all entries in the Test sets (1-5)
 			in sheets 17-21.
 		"""
-		# idppi_test_dict = {k:[] for k in ["Protein1", "Protein2", "Target"]}
 		with open( self.diso_uni_seq_file, "r" ) as f:
 			diso_uni_seq_dict = json.load( f )
 
@@ -100,7 +98,7 @@ class IdppiInput():
 		return idppi_pairs, sorted( unique_uni_ids )
 
 
-	def download_uniprot_seq( self, uni_id: str ):
+	def download_uniprot_seq( self, uni_id: str ) -> Tuple[str, str, bool]:
 		"""
 		Get the UniProt seq given the UniProt ID.
 		"""
@@ -136,7 +134,7 @@ class IdppiInput():
 		print( f"UniProt sequences obtained = {len( self.uniprot_seq_dict )}" )
 
 
-	def filter_idppi_pairs( self, idppi_pairs: Dict ):
+	def filter_idppi_pairs( self, idppi_pairs: Dict ) -> Dict:
 		"""
 		Ignore protein pairs for which:
 			UniProt seq could not be downloaded.
