@@ -1,18 +1,16 @@
-### Contains helper functions for the dataset creation scripts ###
+"""
+Contains helper functions for the dataset creation scripts
 ######### ------>"May the Force serve u well..." <------##########
-##################################################################
+"""
 
 ############# One above all #############
 ##-------------------------------------##
+import os, glob, requests, time, subprocess, json
 import numpy as np
 import pandas as pd
 import h5py
-import glob
-import os
-import requests
-import time
-import subprocess
-import json
+
+import torch
 
 from transformers import BertModel, BertTokenizer
 
@@ -20,10 +18,8 @@ import Bio
 from Bio.PDB import PDBParser
 from Bio.PDB.MMCIFParser import MMCIFParser
 from Bio import SeqIO
-# from dataset.from_APIs_with_love import *
 
 import esm
-import torch
 
 
 #########################################################
