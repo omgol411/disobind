@@ -17,9 +17,9 @@ This script creates a dictionary containing the following outputs for all tasks 
 
 1. Disobind predictions
 2. Binary target masks
-3. Binary mask of interactions between disordered residues (IDR-IDR interactions; disorder_mat1) 
-4. Binary mask of interactions between disordered residues and any other residues (IDR-any interactions; disorder_mat2)
-5. Binary masks based on type of residue (SLiM, aa type: H/P/Aromatic/disorder-promoting)
+3. Binary mask of interactions between disordered residues
+4. Binary mask of interactions between ordered residues
+5. Binary masks based on type of residue (SLiMs, aa type: disorder-promoting/aromatic/hydrophobic/polar)
 
 ## AF2/AF3 predictions
 
@@ -31,10 +31,11 @@ Check all the paths in the constructor before running the script.
 
 The contact maps from AF2/AF3 predicted structures are corrected based on the pLDDT, PAE, and ipTM cutoffs if any. 
 The output is a dictionary for all tasks (contact map and interface residue prediction, across CG resolutions: 1, 5, 10) from AF2 and AF3. 
+*NOTE:* For AF3, to use the contact probabilities for obtaining residue-level contact maps set `self.use_af3_struct = True in the constructor`.  
 
 ## Other method predictions
 
-NOTE: Before the below step, prepare input for other methods according to script (`prepare_other_methods_input.py`) in the `dataset` directory. 
+*NOTE:* Before the below step, prepare input for other methods according to script (`dataset/prepare_other_methods_input.py`).  
 
 Then run the following script for getting predictions for competing methods. 
 
@@ -52,10 +53,14 @@ python analysis.py
 Check all the paths in the constructor before running the script.  
 
 This script parses Disobind/AF2/AF3 outputs for all tasks and all CG values, as well as competing method outputs for interface/CG=1. Following outputs are generated:
-1. OOD set metrics in a CSV file format. 
+For both the OOD test set and Misc dataset it outputs:  
+1. Evaluation metrics for all tasks in a Results_*.csv file. 
 2. AF2 vs AF3 confidence plot and raw data for the plots. 
-3. Sparsity vs F1 score plot and raw data for the plots. 
-4. Predicted interfaces at CG 1 for case specific analysis. Note that we need the input contact maps for the specific cases from script (`prepare_entry_from_pdb.py`) in the `dataset` directory.
+3. Sparsity vs F1 score plot and raw data for the plots.  
 
-   
+
+Additionally, for the Midc dataset it outputs:  
+1. Disobind+AF2 Predicted and the corresponding target interfaces at CG 1 in a .json file.
+2. F1-score for Disobind, AF2, and Disobind+AF2 for each entry in the datset.
+*NOTE:* We need the input contact maps for the specific cases from script (`dataset/prepare_entry_from_pdb.py`).
 
