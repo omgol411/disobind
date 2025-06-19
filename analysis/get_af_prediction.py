@@ -5,7 +5,7 @@ Select confidently predicted interactions based on pLDDT and PAE.
 
 Used for OOD test and Misc dataset.
 """
-import os, josn, pickle as pkl
+import os, json, pickle as pkl
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
