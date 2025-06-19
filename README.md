@@ -11,6 +11,10 @@ Disobind is a deep learning method for predicting inter-protein contact maps and
 * Data is deposited in [Zenodo](https://www.doi.org/10.5281/zenodo.14504762)
 
 
+### Colab Notebook
+We are working on providing a Colab notebook for Disobind.
+
+
 ## Dependencies:
 * See `requirements.txt` for Python dependencies
 
