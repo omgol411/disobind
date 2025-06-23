@@ -1,6 +1,10 @@
 """
 Evaluate Disobind, AF2, AF3 on the OOD test set and Misc dataset.
 Also assess the performance of AIUPred, MORFchibi, and DeepDISOBind.
+Assess Disobind, AF2, and Disobind+AF2 predictions on:
+	Disordered vs ordered regions.
+	Disorderpromoting, aromatic, hydrophobuc, and polar residues.
+	LIPs
 """
 import os, random, json, h5py
 from typing import List, Tuple, Dict, Iterator
@@ -14,11 +18,14 @@ from torch import nn
 from dataset.utility import ranges
 
 from src.metrics import torch_metrics
-from src.utils import plot_reliabity_diagram
 
 MAX_LEN_DICT = {"ood": {19: 100}, "misc": {19: 200}}
 
+
 class JudgementDay():
+	"""
+	Pipeline all analysis to be performed.
+	"""
 	def __init__( self ):
 		# Dataset version.
 		self.data_version = 19
@@ -32,7 +39,7 @@ class JudgementDay():
 		# ipTM cutoff for confident predictions.
 		self.iptm_cutoff = 0.0
 		self.pad = True
-		self.mode = "misc" # "ood" or "misc"
+		self.mode = "ood" # "ood" or "misc"
 		# Max prot1/2 lengths.
 		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
 		self.prec = 2
@@ -199,7 +206,7 @@ class JudgementDay():
 			ood_keys = ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
 					"Disobind", "Random_baseline", "target_mask", 
 					"IDR-IDR", "order",
-					"slims", "disorder_promoting_aa", "aromatic_aa",
+					"lips", "disorder_promoting_aa", "aromatic_aa",
 					"hydrophobic_aa", "polar_aa", "targets"]
 			if self.mode  == "ood":
 				ood_keys.extend( ["Aiupred", "Deepdisobind", "Morfchibi"] )
@@ -263,19 +270,21 @@ class JudgementDay():
 
 						ood_dict[ood_key].append( random_preds )
 
-					elif "slims" in ood_key:
+					elif "lips" in ood_key:
 						if self.mode == "ood":
-							slims1 = self.disobind_preds[entry_id][task]["prot1_slims_mask"]
-							slims2 = self.disobind_preds[entry_id][task]["prot2_slims_mask"]
+							lips1 = self.disobind_preds[entry_id][task]["prot1_lips_mask"]
+							lips2 = self.disobind_preds[entry_id][task]["prot2_lips_mask"]
 
 							if "interaction" in task:
-								slims_mat = slims1*slims2.T
+								# Consider LIP-any interactions.
+								lips2 = np.ones( lips2.shape[0] )
+								lips_mat = lips1*lips2.T
 							elif task == "interface_1":
-								slims_mat = np.concatenate( ( slims1, slims2 ), axis = 0 )
+								lips_mat = np.concatenate( ( lips1, lips2 ), axis = 0 )
 							else:
 								continue
 								# raise ValueError( "Only interface task supported..." )
-							ood_dict[ood_key].append( slims_mat )
+							ood_dict[ood_key].append( lips_mat )
 						# For non ood dataset, just create empty tensors.
 						else:
 							dummy = self.disobind_preds[entry_id][task]["Disobind"]
@@ -337,9 +346,6 @@ class JudgementDay():
 		af_diso = np.stack( [af.reshape( b, m*n ), diso.reshape( b, m*n )], axis = 1 )
 		af_diso = np.max( af_diso, axis = 1 ).reshape( b, m, n )
 
-		# af_diso = ood_dict[diso_key] + ood_dict[af_key]
-		# af_diso = np.where( af_diso > 0, 1, 0 )
-
 		target = ood_dict["targets"]
 		return {combined_model_name: {"pred":af_diso, "target": target}}
 
@@ -380,12 +386,8 @@ class JudgementDay():
 											) -> Dict[str, Dict[str, np.array]]:
 		target = ood_dict["targets"]
 		interaction_types_dict = {}
-		for mask_name in ["disorder_promoting_aa", "aromatic_aa", "hydrophobic_aa", "polar_aa", "slims"]:
+		for mask_name in ["disorder_promoting_aa", "aromatic_aa", "hydrophobic_aa", "polar_aa", "lips"]:
 			for model_name in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2"]:
-				# if "pLDDT_PAE" in model_name:
-				# 	mod_nm = model_name.split( "_pLDDT_PAE" )[0]
-				# else:
-				# 	mod_nm = model_name
 
 				if model_name in ood_dict:
 					preds = ood_dict[model_name]
@@ -451,21 +453,11 @@ class JudgementDay():
 			print( f"Task {task}..." )
 			preds_dict = {}
 
-			# Obtain all raw predictions and combinations of predictions to be tested.
-			# for ood_key in ood_dict.keys():
-				# if key not in ["target_masks", "disorder_mat1", "disorder_mat2", "order_mat",
-				# 				"disorder_promoting_aa", "aromatic_aa",
-				# 				"hydrophobic_aa", "polar_aa", "slims", "targets"]:
-				# 	preds_dict[key] = torch.from_numpy( ood_dict[key] )
-
 			base_models_dict = self.get_base_model_preds( ood_dict = ood_dict )
 			preds_dict.update( base_models_dict )
 
 			af2_diso = self.combine_diso_af_preds( ood_dict = ood_dict, af_model = "AF2" )
 			preds_dict.update( af2_diso )
-
-			# af3_diso = self.combine_diso_af_preds( ood_dict = ood_dict, af_model = "AF3" )
-			# preds_dict.update( af3_diso )
 
 			if task in ["interaction_1", "interface_1"]:
 				interactions_dict = self.get_preds_for_disorder_order_residues( ood_dict = ood_dict,
@@ -509,7 +501,6 @@ class JudgementDay():
 				results_dict[key].append( "" )
 
 		self.create_sparsity_f1_plots( results_dict )
-		# self.case_specific_analysis()
 
 		# Dump all calculated metrics on disk.
 		df = pd.DataFrame( results_dict )

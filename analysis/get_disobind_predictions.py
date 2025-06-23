@@ -1,6 +1,12 @@
-######## Make predictions using trained Disobind models. #######
+"""
 ######## ------>"May the Force serve u well..." <------#########
-################################################################
+Use the trained Disobind models to obtain predictions for the OOD set.
+Also create binary masks for the following:
+	Residues belonging to disordered and ordered regions.
+	Amino acid types:
+		Disorder-promoting, aromatic, hydrophobic, polar
+	LIPs
+"""
 
 ############# One above all #############
 ##-------------------------------------##
@@ -26,18 +32,8 @@ from src.metrics import torch_metrics
 from src.utils import prepare_input
 from params import parameter_files
 
-"""
-Make predictions using the trained model(s).
-The input could be wither:
-	A csv file containg the Prot1 and Prot2 as: UniID1:start1:end1--UniID2:start2:end2_num
-	A fasta file containing both Prot1 nad prot2 with the headers as: >UniID1:start1:end1.
-The former can be used to run predictions in batch while the latter would run only one pair at a rime.
-In case no Uniprot ID is available for a protein, use the fasta file format.
-	Keep the header as: >Prot1:start1:end1.
-	Provide full protein sequence.
-"""
-MAX_LEN_DICT = {"ood": {19: 100, 21: 200},
-				"misc": {19: 200, 21: 200}}
+
+MAX_LEN_DICT = {"ood": {19: 100}, "misc": {19: 200}}
 
 class Prediction():
 	def __init__( self ):
@@ -47,14 +43,14 @@ class Prediction():
 		# Input file type - csv/fasta.
 		self.input_type = "csv"
 		# Dataset version.
-		self.data_version = 21
-		self.model_version = 21
+		self.data_version = 19
+		self.model_version = 19
 		# Embedding type to be used for prediction.
 		self.embedding_type = "T5"
 		# Use global/local embeddings.
 		self.scope = "global"
 		self.device = "cuda" # cpu/cuda.
-		self.mode = "misc"
+		self.mode = "ood"
 		# Max protein length.
 		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
 		# Contact probability threshold.
@@ -70,8 +66,8 @@ class Prediction():
 
 		# Dict to store Uniprot sequences.
 		self.uniprot_seq = {}
-		# Dict to store binary mask for SLiMs.
-		self.slims_masks = {}
+		# Dict to store binary mask for LIPs.
+		self.lips_masks = {}
 		# Dict to store binary mask for disorder promoting residues.
 		self.aa_masks = {}
 		# Dict to store motifs for all UniProt IDs.
@@ -165,7 +161,7 @@ class Prediction():
 			with open( self.motifs_file_path, "r" ) as f:
 				self.motifs_dict = json.load( f )
 
-		self.create_slim_masks( headers )
+		self.create_lip_masks( headers )
 		self.create_aa_masks( headers )
 
 		print( "Creating global embeddings for the input sequences..." )
@@ -640,10 +636,11 @@ class Prediction():
 			json.dump( self.motifs_dict, w )
 
 
-	def create_slim_masks( self, headers ):
+	def create_lip_masks( self, headers ):
 		"""
-		Create binary masks for SLiMs in prot1 and prot2.
-		The binary mask indicates if any of the residue is part of a SLiM motif.
+		Create binary masks for LIPs in prot1 and prot2.
+		The binary mask indicates if any of the residue is part of a
+			LIP (Linear Intercating Peptide).
 
 		Inputs:
 		----------
@@ -653,8 +650,8 @@ class Prediction():
 		----------
 		None
 		"""
-		self.logs["counts"]["slims1"] = 0
-		self.logs["counts"]["slims2"] = 0
+		self.logs["counts"]["lips1"] = 0
+		self.logs["counts"]["lips2"] = 0
 		for head in headers:
 			head1, head2 = head.split( "--" )
 			head2, num = head2.split( "_" )
@@ -666,22 +663,25 @@ class Prediction():
 			p1_pos = np.arange( start1, end1 + 1, 1 )
 			p2_pos = np.arange( start2, end2 + 1, 1 )
 
-			slims1 = self.motifs_dict[uni_id1]
-			slims2 = self.motifs_dict[uni_id2]
-			p1_pos = [int( res in slims1 ) for res in p1_pos]
-			p2_pos = [int( res in slims2 ) for res in p2_pos]
+			lips1 = self.motifs_dict[uni_id1]
+			lips2 = self.motifs_dict[uni_id2]
+
+			# Add 1 for residues part of lips, else 0.
+			p1_pos = [int( res in lips1 ) for res in p1_pos]
+			p2_pos = [int( res in lips2 ) for res in p2_pos]
 			
+			# Pad to max length.
 			pad_p1_pos = np.zeros( ( self.max_len ) )
 			pad_p1_pos[:len( p1_pos )] = p1_pos
 			pad_p2_pos = np.zeros( ( self.max_len ) )
 			pad_p2_pos[:len( p2_pos )] = p2_pos
 
-			self.slims_masks[head] = {}
-			self.slims_masks[head]["prot1"] = pad_p1_pos.reshape( -1, 1 )
-			self.slims_masks[head]["prot2"] = pad_p2_pos.reshape( -1, 1 )
+			self.lips_masks[head] = {}
+			self.lips_masks[head]["prot1"] = pad_p1_pos.reshape( -1, 1 )
+			self.lips_masks[head]["prot2"] = pad_p2_pos.reshape( -1, 1 )
 
-			self.logs["counts"]["slims1"] += np.count_nonzero( pad_p1_pos )
-			self.logs["counts"]["slims2"] += np.count_nonzero( pad_p2_pos )
+			self.logs["counts"]["lips1"] += np.count_nonzero( pad_p1_pos )
+			self.logs["counts"]["lips2"] += np.count_nonzero( pad_p2_pos )
 
 
 	def get_disorder_promoting_aa_mask( self, seq: str ):
@@ -880,8 +880,8 @@ class Prediction():
 													"order": order_mat,
 													"prot1_aa_mask": self.aa_masks[entry_id]["prot1"],
 													"prot2_aa_mask": self.aa_masks[entry_id]["prot2"],
-													"prot1_slims_mask": self.slims_masks[entry_id]["prot1"],
-													"prot2_slims_mask": self.slims_masks[entry_id]["prot2"]
+													"prot1_lips_mask": self.lips_masks[entry_id]["prot1"],
+													"prot2_lips_mask": self.lips_masks[entry_id]["prot2"]
 														}
 
 					print( f"{idx} ------------------------------------------------------------\n" )
