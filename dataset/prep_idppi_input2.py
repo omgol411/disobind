@@ -21,7 +21,7 @@ class IdppiInput():
 		self.idppi_output_dir = os.path.join( self.base_dir, "./idppi/" )
 
 		self.idppi_file = os.path.join( self.base_dir, "input_files/41598_2018_28815_MOESM2_ESM.xlsx" )
-		self.diso_uni_seq_file = os.path.join( self.base_dir, "v_21/Uniprot_seq.json" )
+		self.diso_uni_seq_file = os.path.join( self.base_dir, "v_19/Uniprot_seq.json" )
 
 		self.cores = 100
 		self.max_seq_len = 10000
