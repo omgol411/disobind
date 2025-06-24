@@ -666,7 +666,7 @@ class parse_pdbs_for_idrs():
 					if entry_data == None or entity_data == None:
 						if os.path.exists( f"{self.PDB_api_path}{pdb}_entry.json" ):
 							subprocess.call( ["rm", f"{self.PDB_api_path}{pdb}_entry.json"] )
-						elif os.path.exists( f"{self.PDB_api_path}{pdb}_entity.json" ):
+						if os.path.exists( f"{self.PDB_api_path}{pdb}_entity.json" ):
 							subprocess.call( ["rm", f"{self.PDB_api_path}{pdb}_entity.json"] )
 						
 						if trial == self.max_trials - 1:
