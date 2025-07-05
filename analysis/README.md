@@ -58,7 +58,7 @@ For both the OOD test set and Misc dataset it outputs:
 3. Sparsity vs F1 score plot and raw data for the plots.  
 
 
-Additionally, for the Midc dataset it outputs:
+Additionally, for the Misc dataset it outputs:
 1. Disobind+AF2 Predicted and the corresponding target interfaces at CG 1 in a .json file.
 2. F1-score for Disobind, AF2, and Disobind+AF2 for each entry in the datset.  
 
