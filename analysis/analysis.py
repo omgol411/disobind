@@ -1,10 +1,16 @@
+"""
+Evaluate Disobind, AF2, AF3 on the OOD test set and Misc dataset.
+Also assess the performance of AIUPred, MORFchibi, and DeepDISOBind.
+Assess Disobind, AF2, and Disobind+AF2 predictions on:
+	Disordered vs ordered regions.
+	Disorderpromoting, aromatic, hydrophobuc, and polar residues.
+	LIPs
+"""
+import os, random, json, h5py
+from typing import List, Tuple, Dict, Iterator
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import h5py
-import json
-import random
-import os
 
 import torch
 from torch import nn
@@ -12,13 +18,18 @@ from torch import nn
 from dataset.utility import ranges
 
 from src.metrics import torch_metrics
-from src.utils import plot_reliabity_diagram
+
+MAX_LEN_DICT = {"ood": {19: 100}, "misc": {19: 200}}
 
 
 class JudgementDay():
+	"""
+	Pipeline all analysis to be performed.
+	"""
 	def __init__( self ):
 		# Dataset version.
-		self.version = 19
+		self.data_version = 19
+		self.model_version = 19
 		# path for the dataset dir.
 		self.base_path = f"../database/"
 		# Seed for the PRNGs.
@@ -26,40 +37,63 @@ class JudgementDay():
 		# Cutoff to dfine contact for disobind predictions.
 		self.contact_threshold = 0.5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.75
-		# Max prot1/2 lengths.
-		self.max_len = 100
+		self.iptm_cutoff = 0.0
 		self.pad = True
+		self.mode = "ood" # "ood" or "misc"
+		# Max prot1/2 lengths.
+		self.max_len = MAX_LEN_DICT[self.mode][self.model_version]
+		self.prec = 2
 		self.device = "cuda"
 
+		if self.mode == "ood":
+			self.base_af_dir = f"./AF_preds_v{self.data_version}/"
+			self.diso_base_dir = f"./Predictions_{self.mode}_v_{self.data_version}/"
+			# OOD set target contact maps file.
+			self.target_cmap = f"{self.base_path}v_{self.data_version}/Target_bcmap_test_v_{self.data_version}.h5"
+			# Disobind predictions file.
+			self.disobind_preds = f"{self.diso_base_dir}Disobind_Predictions.npy"
+
+		elif self.mode == "misc":
+			self.base_af_dir = f"./AF_misc_preds_v{self.data_version}/"
+			self.diso_base_dir = f"./Predictions_{self.mode}_v_{self.data_version}/"
+			# OOD set target contact maps file.
+			self.target_cmap = f"{self.base_path}Misc/misc_test_target.h5"
+			# Disobind predictions file.
+			self.disobind_preds = f"{self.diso_base_dir}Disobind_Predictions_misc.npy"
+			self.summary_file = "../database/Misc/Summary.json"
+
+		else:
+			raise ValueError( "Incorrect mode specified (ood/misc supported)..." )
+
 		# AF2 predictions file.
-		self.af2m_preds = f"./AF_preds_v{self.version}/Predictions_af2m_results_{self.iptm_cutoff}.npy"
+		self.af2m_preds = f"{self.base_af_dir}Predictions_af2m_results_{self.iptm_cutoff}.npy"
 		# AF3 predictions file.
-		self.af3_preds = f"./AF_preds_v{self.version}/Predictions_af3_results_{self.iptm_cutoff}.npy"
-		# Disobind predictions file.
-		self.disobind_preds = f"./Predictions_ood_v{self.version}/Disobind_Predictions.npy"
+		self.af3_preds = f"{self.base_af_dir}Predictions_af3_results_{self.iptm_cutoff}.npy"
+
+		# Predictions from AIUPred and DeepDisoBind
+		self.other_methods = "./other_methods/other_methods.npy"
 
 		# OOD set target contact maps file.
-		self.target_cmap = f"{self.base_path}v_{self.version}/Target_bcmap_test_v_{self.version}.h5"
-		# Fraction of positives in the dataset for all tasks.
-		self.fraction_positives = f"{self.base_path}v_{self.version}/T5/global-None/fraction_positives.json"
+		self.fraction_positives = f"{self.base_path}v_{self.data_version}/T5/global-None/fraction_positives.json"
 		# File containing info about the merged binary complexes in the dataset.
-		self.merged_binary_complexes_dir = f"{self.base_path}v_{self.version}/merged_binary_complexes/"
+		self.merged_binary_complexes_dir = f"{self.base_path}v_{self.data_version}/merged_binary_complexes/"
 
-		self.output_dir = f"./Analysis_OOD_{self.version}_{self.iptm_cutoff}/"
+		self.output_dir = f"./Analysis_{self.mode.upper()}_{self.data_version}_{self.iptm_cutoff}/"
 
 		# File to store all results.
-		self.full_results_file = f"{self.output_dir}Results_OOD_set_{self.version}.csv"
-		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.version}.csv"
+		self.full_results_file = f"{self.output_dir}Results_OOD_set_{self.data_version}.csv"
+		self.subset_results_file = f"{self.output_dir}Results_OOD_set_subset_{self.data_version}.csv"
+		self.other_methods_result_file = f"{self.output_dir}Results_other_methods_{self.data_version}.csv"
 		
 		# Files for the plots and raw data.
-		self.af_conf_pred_counts_file = f"{self.output_dir}Confident_AF_preds_{self.version}.txt"
-		self.af_confidence_file = f"{self.output_dir}AF_confidence_plot_{self.version}"
-		self.af_confidence_scores = f"{self.output_dir}AF_confidence_scores_{self.version}.csv"
-		self.sparsity_file = f"{self.output_dir}Sparsity_F1_plot_{self.version}"
-		self.case_specific_analysis_file = f"{self.output_dir}Case_sp_analysis_{self.version}"
-		self.top_preds_diso_af2_file = f"{self.output_dir}Top_preds_Diso_AF2_{self.version}"
-		self.top_preds_file = f"{self.output_dir}Top_preds_{self.version}"
+		self.af_conf_pred_counts_file = f"{self.output_dir}Confident_AF_preds_{self.data_version}.txt"
+		self.af_confidence_file = f"{self.output_dir}AF_confidence_plot_{self.data_version}"
+		self.af_confidence_scores = f"{self.output_dir}AF_confidence_scores_{self.data_version}.csv"
+		self.sparsity_file = f"{self.output_dir}Sparsity_F1_plot_{self.data_version}"
+		self.case_specific_analysis_file = f"{self.output_dir}Case_sp_analysis_{self.data_version}"
+		self.top_preds_diso_af2_file = f"{self.output_dir}Top_preds_Diso_AF2_{self.data_version}"
+		self.top_preds_file = f"{self.output_dir}Top_preds_{self.data_version}"
+		self.misc_dict_file = f"{self.output_dir}Misc_dict_{self.data_version}.json"
 
 
 	def seed_worker( self ):
@@ -80,6 +114,8 @@ class JudgementDay():
 		self.af3_preds = np.load( self.af3_preds, allow_pickle = True ).item()
 		self.disobind_preds = np.load( self.disobind_preds, allow_pickle = True ).item()
 		self.target_cmap = h5py.File( self.target_cmap, "r" )
+		if self.mode == "ood":
+			self.other_methods = np.load( self.other_methods, allow_pickle = True ).item()
 		self.fraction_positives = json.load( open( self.fraction_positives, "r" ) )
 
 		self.count_confident_AF_predictions()
@@ -97,7 +133,7 @@ class JudgementDay():
 
 	def prepare_target( self, target, task ):
 		if self.pad:
-			max_len = [100, 100]
+			max_len = [self.max_len, self.max_len]
 		else:
 			max_len = [target.shape]
 		
@@ -153,80 +189,248 @@ class JudgementDay():
 		return random_preds
 
 
-	def create_ood_set_tensors( self ):
+	def create_ood_set_tensors( self ) -> Iterator[Tuple[str, Dict[str, np.array], List]]:
 		"""
 		Generator function that loads all predictions, masks, target cmap, disorder matrices 
 			from Disobind, AF2, AF3 OOD prediction files, create a batch for all OOD entries 
 			and yields an OOD dict for each task.
-
-		Input:
-		----------
-		Does not take any arguments.
-
-		Yields:
-		----------
-		task --> (str) interaction/interface prediction at specific coarse-grained resolution.
-		ood_dict --> (dict) containing Disobind, AF2, AF3 predictions, target masks, disorder matrices, 
-					and target cmaps for all OOD entries.
+		This function returns the following:
+			task --> mme of the task (e.g. interaction_1).
+			ood_dict: dict containing all required tensors for the dataset
+						(ood/misc) for a task.
+			entry_ids --> a list of all the dataset entry_id.
 		"""
 		# For all tasks.
 		for task in self.get_tasks():
 			counts = [0, 0, 0]
-			# All fields to be included for the results.
-			ood_dict = {key:[] for key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
-											"Disobind_uncal", "Random_baseline", "masks", 
-											"disorder_mat1", "disorder_mat2", "targets"]}
+			ood_keys = ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE",
+					"Disobind", "Random_baseline", "target_mask", 
+					"IDR-IDR", "order",
+					"lips", "disorder_promoting_aa", "aromatic_aa",
+					"hydrophobic_aa", "polar_aa", "targets"]
+			if self.mode  == "ood":
+				ood_keys.extend( ["Aiupred", "Deepdisobind", "Morfchibi"] )
 
+			# All fields to be included for the results.
+			ood_dict = {key:[] for key in ood_keys}
+			
 			# For all entries.
 			entry_ids = []
-			for idx, key1 in enumerate( self.target_cmap.keys() ):
-				target = np.array( self.target_cmap[key1] )
+			for idx, entry_id in enumerate( self.target_cmap.keys() ):
+				target = np.array( self.target_cmap[entry_id] )
 				target = self.prepare_target( target, task )
 
 				# Ignoring this entry, as AF2-multimer crashed for this.
-				if key1 == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
+				if entry_id == "P0DTD1:1743:1808--P0DTD1:1565:1641_1":
 					continue
 
-				u1, u2 = key1.split( "--" )
+				u1, u2 = entry_id.split( "--" )
 				u1 = u1.split( ":" )[0]
 				u2, c = u2.split( "_" )
 				u2 = u2.split( ":" )[0]
 
-				# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
-				# 	Ignoring these from evaluation.
+				entry_ids.append( entry_id )
+
+					# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
+					# 	Ignoring these from evaluation.
 				if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0", "O85041--O85043_0", "P25024--P10145_0"]:
+										"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0",
+										"O85041--O85043_0", "P25024--P10145_0"]:
 					continue
 
-				entry_ids.append( key1 )
-
 				# For all fields in the prediction dict.
-				for key2 in ood_dict.keys():
-					if "AF2" in key2:
-						ood_dict[key2].append( self.af2m_preds[key1][task][key2] )
+				for ood_key in ood_dict.keys():
+					if "AF2" in ood_key:
+						ood_dict[ood_key].append( self.af2m_preds[entry_id][task][ood_key] )
 					
-					elif "AF3" in key2:
-						ood_dict[key2].append( self.af3_preds[key1][task][key2] )
+					elif "AF3" in ood_key:
+						ood_dict[ood_key].append( self.af3_preds[entry_id][task][ood_key] )
 
-					elif "Disobind" in key2:
-						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
+					elif "Disobind" in ood_key:
+						ood_dict[ood_key].append( self.disobind_preds[entry_id][task][ood_key] )
 
-					elif key2 in ["masks", "disorder_mat1", "disorder_mat2"]:
-						ood_dict[key2].append( self.disobind_preds[key1][task][key2] )
+					elif ood_key in ["Aiupred", "Morfchibi", "Deepdisobind"]:
+						if task == "interface_1" and self.mode == "ood":
+							ood_dict[ood_key].append( self.other_methods[ood_key.lower()][f"{u1}--{u2}_{c}"] )
+						# Empty arrays for all other tasks.
+						else:
+							dummy = self.disobind_preds[entry_id][task]["Disobind"]
+							ood_dict[ood_key].append( np.zeros( dummy.shape ) )
 
-					elif key2 == "targets":
-						ood_dict[key2].append( target*self.disobind_preds[key1][task]["masks"] )
+					elif ood_key in ["target_mask", "IDR-IDR", "order"]:
+						ood_dict[ood_key].append( self.disobind_preds[entry_id][task][ood_key] )
 
-					elif "Random" in key2:
+					elif ood_key == "targets":
+						# Apply the padding amsk.
+						ood_dict[ood_key].append( target*self.disobind_preds[entry_id][task]["target_mask"] )
+
+					elif "Random" in ood_key:
 						random_preds = self.get_random_baseline( target, task )
-						random_preds = random_preds*self.disobind_preds[key1][task]["masks"]
+						random_preds = random_preds*self.disobind_preds[entry_id][task]["target_mask"]
 
-						ood_dict[key2].append( random_preds )
+						ood_dict[ood_key].append( random_preds )
+
+					elif "lips" in ood_key:
+						if self.mode == "ood":
+							lips1 = self.disobind_preds[entry_id][task]["prot1_lips_mask"]
+							lips2 = self.disobind_preds[entry_id][task]["prot2_lips_mask"]
+
+							if "interaction" in task:
+								# Consider LIP-any interactions.
+								lips2 = np.ones( lips2.shape[0] )
+								lips_mat = lips1*lips2.T
+							elif task == "interface_1":
+								lips_mat = np.concatenate( ( lips1, lips2 ), axis = 0 )
+							else:
+								continue
+								# raise ValueError( "Only interface task supported..." )
+							ood_dict[ood_key].append( lips_mat )
+						# For non ood dataset, just create empty tensors.
+						else:
+							dummy = self.disobind_preds[entry_id][task]["Disobind"]
+							ood_dict[ood_key].append( np.zeros( dummy.shape ) )
+
+					elif ood_key in ["disorder_promoting_aa", "aromatic_aa", "hydrophobic_aa", "polar_aa"]:
+						if self.mode == "ood":
+							aa1_mask = self.disobind_preds[entry_id][task]["prot1_aa_mask"][ood_key]
+							aa2_mask = self.disobind_preds[entry_id][task]["prot2_aa_mask"][ood_key]
+							if "interaction" in task:
+								aa_mask = aa1_mask*aa2_mask.T
+							elif task == "interface_1":
+								aa_mask = np.concatenate( ( aa1_mask, aa2_mask ), axis = 0 )
+							else:
+								continue
+							ood_dict[ood_key].append( aa_mask )
+						# For non ood dataset, just create empty tensors.
+						else:
+							dummy = self.disobind_preds[entry_id][task]["Disobind"]
+							ood_dict[ood_key].append( np.zeros( dummy.shape ) )
 
 			for key in ood_dict.keys():
-				ood_dict[key] = np.stack( ood_dict[key] )
+				if len( ood_dict[key] ) == 0:
+					continue
+				else:
+					ood_dict[key] = np.stack( ood_dict[key] )
 
 			yield task, ood_dict, entry_ids
+
+
+	def get_base_model_preds( self, ood_dict: Dict[str, np.array] ):
+		"""
+		Get predictions and the respective target for Disobind, AF2, AF3, and Random baseline.
+		"""
+		base_models_dict = {}
+		target = ood_dict["targets"]
+		for model_key in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind", "Random_baseline"]:
+			preds = ood_dict[model_key]
+
+			base_models_dict[model_key] = {
+					"pred": preds, "target": target
+				}
+		return base_models_dict
+
+
+	def combine_diso_af_preds( self, ood_dict: Dict[str, np.array],
+								af_model: str ) -> Dict[str, np.array]:
+		"""
+		Combine Disobind and AF2/3 predictions by taking the max over either.
+		Return a dict containing the combine dmodel prediction and the respective target.
+		"""
+		combined_model_name = f"Disobind_{af_model}"
+		af_key = f"{af_model}_pLDDT_PAE"
+		diso_key = "Disobind"
+
+		diso = ood_dict[diso_key]
+		af = ood_dict[af_key]
+		b, m, n = diso.shape
+		af_diso = np.stack( [af.reshape( b, m*n ), diso.reshape( b, m*n )], axis = 1 )
+		af_diso = np.max( af_diso, axis = 1 ).reshape( b, m, n )
+
+		target = ood_dict["targets"]
+		return {combined_model_name: {"pred":af_diso, "target": target}}
+
+
+	def get_preds_for_disorder_order_residues( self, ood_dict: Dict[str, np.array],
+												preds_dict: Dict[str, np.array]
+												) -> Dict[str, Dict[str, np.array]]:
+		"""
+		Obtain predictions focusing specifically on disordered or ordered residues.
+		Get predictions from Disobind, AF2, AF3, Diso+AF2, Diso+AF3.
+		"""
+		interactions_dict = {}
+		target = ood_dict["targets"]
+		for interaction_name in ["IDR-IDR", "order"]:
+			for model_key in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2"]:
+				if model_key in ood_dict:
+					preds = ood_dict[model_key]
+				elif model_key in preds_dict:
+					preds = preds_dict[model_key]["pred"]
+				else:
+					raise ValueError( f"{model_key} not present in ood_dict and preds_dict..." )
+			
+				interaction_mat = ood_dict[interaction_name]
+
+				interaction_pred = preds*interaction_mat
+				interaction_target = target*interaction_mat
+
+				inetraction_key = f"{model_key}_{interaction_name}"
+				interactions_dict[inetraction_key] = {
+						"pred": interaction_pred,
+						"target": interaction_target
+					}
+		return interactions_dict
+
+
+	def get_preds_for_interaction_types( self, ood_dict: Dict[str, np.array],
+											preds_dict: Dict[str, np.array]
+											) -> Dict[str, Dict[str, np.array]]:
+		target = ood_dict["targets"]
+		interaction_types_dict = {}
+		for mask_name in ["disorder_promoting_aa", "aromatic_aa", "hydrophobic_aa", "polar_aa", "lips"]:
+			for model_name in ["Disobind", "AF2_pLDDT_PAE", "AF3_pLDDT_PAE", "Disobind_AF2"]:
+
+				if model_name in ood_dict:
+					preds = ood_dict[model_name]
+				elif model_name in preds_dict:
+					preds = preds_dict[model_name]["pred"]
+				else:
+					print( mask_name, "  ", model_name )
+					raise ValueError( f"{mask_name}/{model_name} not " +
+										"present in ood_dict and preds_dict...")
+
+				
+				mask_mat = ood_dict[mask_name]
+				interaction_pred = preds*mask_mat
+				interaction_target = target*mask_mat
+
+				interaction_key = f"{model_name}_{mask_name}"
+				interaction_types_dict[interaction_key] = {
+						"pred": interaction_pred,
+						"target": interaction_target
+					}
+		return interaction_types_dict
+
+
+
+	def get_other_method_preds( self, ood_dict: Dict[str, np.array]
+								) -> Dict[str, Dict[str, np.array]]:
+
+		"""
+		Get the predictions and the respective targets for
+			Aiupred, Deepdisobind, Morfchibi.
+		Considering only protein prediction.
+		"""
+		other_methods_dict = {}
+		target = ood_dict["targets"]
+		p1_target = target[:self.max_len]
+		for model_name in ["Aiupred", "Morfchibi", "Deepdisobind"]:
+			preds = ood_dict[model_name]
+
+			other_methods_dict[model_name] = {
+						"pred": preds,
+						"target": p1_target
+					}
+		return other_methods_dict
 
 
 
@@ -249,85 +453,148 @@ class JudgementDay():
 			print( f"Task {task}..." )
 			preds_dict = {}
 
-			# Obtain all raw predictions and combinations of predictions to be tested.
-			for key in ood_dict.keys():
-				if key not in ["masks", "disorder_mat1", "disorder_mat2", "targets"]:
-					preds_dict[key] = torch.from_numpy( ood_dict[key] )
+			base_models_dict = self.get_base_model_preds( ood_dict = ood_dict )
+			preds_dict.update( base_models_dict )
 
-			# AF2/AF3 pLDDT+PAE corrected predictions combined with Disobind predictions.
-			b, m, n = ood_dict["AF2_pLDDT_PAE"].shape
-			af2_diso = np.stack( [ood_dict["AF2_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_uncal"].reshape( b, m*n )], axis = 1 )
-			af2_diso = np.max( af2_diso, axis = 1 ).reshape( b, m, n )
-			preds_dict["AF2_Disobind_uncal"] = torch.from_numpy( af2_diso )
-			
+			af2_diso = self.combine_diso_af_preds( ood_dict = ood_dict, af_model = "AF2" )
+			preds_dict.update( af2_diso )
 
-			af3_diso = np.stack( [ood_dict["AF3_pLDDT_PAE"].reshape( b, m*n ), ood_dict["Disobind_uncal"].reshape( b, m*n )], axis = 1 )
-			af3_diso = np.max( af3_diso, axis = 1 ).reshape( b, m, n )
-			preds_dict["AF3_Disobind_uncal"] = torch.from_numpy( af3_diso )
+			if task in ["interaction_1", "interface_1"]:
+				interactions_dict = self.get_preds_for_disorder_order_residues( ood_dict = ood_dict,
+																				preds_dict = preds_dict )
+				preds_dict.update( interactions_dict )
 
-			
-			# AF2/AF3 pLDDT+PAE corrected predictions for IDR-IDR and IDR-any interactions.
-			preds_dict["AF2_IDR-IDR"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
-			preds_dict["AF3_IDR-IDR"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat1"] )
+				interaction_types_dict = self.get_preds_for_interaction_types( ood_dict = ood_dict,
+																				preds_dict = preds_dict )
+				preds_dict.update( interaction_types_dict )
 
-			preds_dict["AF2_Disobind_uncal_IDR-IDR"] = torch.from_numpy( af2_diso*ood_dict["disorder_mat1"] )
-			if "interaction" in task:
-				preds_dict["AF2_IDR-any"] = torch.from_numpy( ood_dict["AF2_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
-				preds_dict["AF3_IDR-any"] = torch.from_numpy( ood_dict["AF3_pLDDT_PAE"]*ood_dict["disorder_mat2"] )
-			
-			# Disobind predictions for IDR-IDR and IDR-any interactions.
-			preds_dict["Disobind_uncal_IDR-IDR"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat1"] )
-			if "interaction" in task:
-				preds_dict["Disobind_uncal_IDR-any"] = torch.from_numpy( ood_dict["Disobind_uncal"]*ood_dict["disorder_mat2"] )
+
+			if task == "interface_1":
+				if self.mode == "ood":
+					other_methods_dict = self.get_other_method_preds( ood_dict = ood_dict )
+					preds_dict.update( other_methods_dict )
+
+				if self.mode == "misc":
+					# Case specific analysis for interface 1 prediction.
+					self.case_specific_analysis( entry_ids, preds_dict )
 
 			# now calculate the metrics for all predictions.
-			for key in preds_dict.keys():
+			for model_key in preds_dict.keys():
 				obj, cg = task.split( "_" )
-
-				metrics = self.calculate_metrics( pred = preds_dict[key].to( self.device ), 
-													target = torch.from_numpy( ood_dict["targets"] ).to( self.device ), 
-													multidim_avg = "global" )
+				# print( f"{model_key}" )
+				preds = torch.from_numpy( preds_dict[model_key]["pred"] ).float()
+				target = torch.from_numpy( preds_dict[model_key]["target"] ).float()
+				metrics = self.calculate_metrics( pred = preds.to( self.device ),
+													target = target.to( self.device ),
+													multidim_avg = "global",
+													contact_threshold = self.contact_threshold )
 				results_dict["Objective"].append( obj.title() )
 				results_dict["CG"].append( cg )
-				results_dict["Model"].append( key )
+				results_dict["Model"].append( model_key )
 				results_dict["Recall"].append( metrics[0] )
 				results_dict["Precision"].append( metrics[1] )
 				results_dict["F1-score"].append( metrics[2] )
 
-			# if task == "interface_1":
-			# 	# Create contact density vs interface 1 prediction plots.
-			# 	self.create_performance_contactdensity_plots( entry_ids, 
-			# 													preds_dict["Disobind_uncal"], 
-			# 													preds_dict["AF2_pLDDT_PAE"], 
-			# 													ood_dict["targets"] )
-
-			# Do for all tasks.
-			# self.create_calibration_plots( preds_dict["Disobind_uncal"], preds_dict["Disobind_cal"], ood_dict["targets"], task )
 
 			# Just adding a empty row for separating different tasks.
 			for key in results_dict.keys():
 				results_dict[key].append( "" )
 
 		self.create_sparsity_f1_plots( results_dict )
-		self.case_specific_analysis()
 
 		# Dump all calculated metrics on disk.
 		df = pd.DataFrame( results_dict )
 		df.to_csv( self.full_results_file )
 
-		# Dump a subset of results o disk - for ease of looking.
-		subset_dict = {key:[] for key in results_dict.keys() if key not in ["AvgPrecision", "MCC", "AUROC", "Accuracy"]}
-		for i in range( len( results_dict["Model"] ) ):
-			if results_dict["Model"][i] in ["AF2_pLDDT_PAE", "AF3_pLDDT_PAE","Disobind_uncal", 
-											"AF2_Disobind_uncal", "AF3_Disobind_uncal",
-											"AF2_IDR-IDR", "AF3_IDR-IDR", "AF2_Disobind_uncal_IDR-IDR",
-											 "Disobind_uncal_IDR-IDR", "Disobind_uncal_IDR-any", ""]:
-				for key in subset_dict.keys():
-					subset_dict[key].append( results_dict[key][i] )
 
-		df = pd.DataFrame( subset_dict )
-		df.to_csv( self.subset_results_file )
+	# def get_samplewise_metrics( self, entries, diso_preds, af2_preds, diso_af2_preds, target ):
+	def case_specific_analysis( self, entries, preds_dict: torch.tensor ):
+		"""
+		Save the samplewise F1-score for interface_1 on the Misc dataset.
+		"""
+		with open( self.summary_file, "r" ) as f:
+			summary = json.load( f )
+		pdb_ids = []
+		for entry_id in entries:
+			pdb_ids.append( summary[entry_id]["pdb_id"] )
 
+		entries = np.array( entries )
+		metrics_dict = {}
+		for model_key in ["Disobind", "AF2_pLDDT_PAE", "Disobind_AF2"]:
+			metrics_dict[model_key] = {}
+
+			preds = torch.from_numpy( preds_dict[model_key]["pred"] ).float()
+			target = torch.from_numpy( preds_dict[model_key]["target"] ).float()
+
+			metrics = torch_metrics( preds = preds.to( self.device ), 
+									target = target.to( self.device ), 
+									threshold = self.contact_threshold,
+									multidim_avg = "samplewise_none",
+									device = self.device )
+			met = metrics[2].detach().cpu().numpy()
+			metrics_dict[model_key]["F1"] = np.round( met, self.prec )
+
+		# Save samplewsie metrics on OOD set.
+		df = pd.DataFrame()
+		df["Entry ID"] = entries
+		df["PDB ID"] = pdb_ids
+		for model_name in metrics_dict:
+			for met_name in metrics_dict[model_name]:
+				df[f"{model_name}-{met_name}"] = metrics_dict[model_name][met_name]
+
+		df.to_csv( f"{self.case_specific_analysis_file}.csv", index = False )
+
+		misc_dict = {}
+		af2_diso = preds_dict["Disobind_AF2"]["pred"].copy()
+		target = preds_dict["Disobind_AF2"]["target"].copy()
+		for i, entry_id in enumerate( entries ):
+			misc_dict[entry_id] = {}
+			misc_dict[entry_id]["AF2+Diso"] = list( af2_diso[i].reshape( -1 ) )
+			misc_dict[entry_id]["Target"] = list( target[i].astype( float ).reshape( -1 ) )
+		with open( self.misc_dict_file, "w" ) as w:
+			json.dump( misc_dict, w )
+
+
+	def eval_other_methods( self, diso_preds: torch.tensor, aiupred_preds: torch.tensor,
+							deepdisobind_preds: torch.tensor, morfchibi_preds: torch.tensor,
+							target: torch.tensor ):
+		"""
+		Compare Disobind performance with AIUPred, DeepDisoBind, and MORfchibi.
+		The later 3 are partner-independent interface predictors for IDRs and
+			so we evaluate performance only for the prot1 in all OOD entries
+			which is an IDR.
+		"""
+		# Need to slice out the protein1 interface only from diso_preds and target.
+		diso_p1 = diso_preds[:,:self.max_len].to( self.device )
+		aiupred_p1 = aiupred_preds[:,:self.max_len].to( self.device )
+		deepdisobind_p1 = deepdisobind_preds[:,:self.max_len].to( self.device )
+		morfchibi_p1 = morfchibi_preds[:,:self.max_len].to( self.device )
+		target_p1 = target[:,:self.max_len].to( self.device )
+
+		diso_metrics = self.calculate_metrics( pred = diso_p1,
+													target = target_p1,
+													multidim_avg = "global",
+													contact_threshold = self.contact_threshold )
+		aiupred_metrics = self.calculate_metrics( pred = aiupred_p1,
+													target = target_p1,
+													multidim_avg = "global",
+													contact_threshold = self.contact_threshold )
+		deepdisobind_metrics = self.calculate_metrics( pred = deepdisobind_p1,
+														target = target_p1,
+														multidim_avg = "global",
+														contact_threshold = self.contact_threshold )
+		morfchibi_metrics = self.calculate_metrics( pred = morfchibi_p1,
+													target = target_p1,
+													multidim_avg = "global",
+													contact_threshold = 0.775 )
+
+
+		df = pd.DataFrame()
+		df["Model"] = ["Disobind_uncal", "Aiupred", "Deepdisobind", "Morfchibi"]
+		df["Recall"] = [diso_metrics[0], aiupred_metrics[0], deepdisobind_metrics[0], morfchibi_metrics[0]]
+		df["Precision"] = [diso_metrics[1], aiupred_metrics[1], deepdisobind_metrics[1], morfchibi_metrics[1]]
+		df["F1-score"] = [diso_metrics[2], aiupred_metrics[2], deepdisobind_metrics[2], morfchibi_metrics[2]]
+		df.to_csv( self.other_methods_result_file, index = False )
 
 
 	def count_confident_AF_predictions( self ):
@@ -358,12 +625,6 @@ class JudgementDay():
 			u2, c = u2.split( "_" )
 			u2 = u2.split( ":" )[0]
 
-			# These Uniprot pairs are sequence redundant with PDB70 at 20% seq identity.
-			# 	Ignoring these from evaluation.
-			if f"{u1}--{u2}_{c}" in ["P0DTC9--P0DTD1_2", "Q96PU5--Q96PU5_0", "P0AG11--P0AG11_4", 
-									"Q9IK92--Q9IK91_0", "Q16236--O15525_0", "P12023--P12023_0", "O85041--O85043_0", "P25024--P10145_0"]:
-				continue
-
 			selected_entries.append( key )
 			af2_score.append( self.af2m_preds[key]["scores"][0] )
 			af3_score.append( self.af3_preds[key]["scores"][0] )
@@ -381,8 +642,6 @@ class JudgementDay():
 			if af2_score[-1] >= af3_score[-1]:
 				counts6 += 1
 
-		# print( counts1, "  ", counts2, "  ",counts3, "  ", counts4, "  ", counts5, "  ", counts6 )
-		# exit()
 		plt.plot( [0, 1], [0, 1], color = "gray" )
 		plt.scatter( af2_score, af3_score )
 		plt.axvline( self.iptm_cutoff, color = "red" )
@@ -407,34 +666,6 @@ class JudgementDay():
 			w.writelines( f"AF2  ipTM >= AF3  ipTM = {counts6}\n" )
 
 
-
-	def create_calibration_plots( self, uncal_pred, cal_pred, target, task ):
-		"""
-		Create the calibration plots for the uncalibrated and calibrated Disobind preds.
-		Save the raw data on disk.
-
-		Input:
-		----------
-		uncal_pred --> (torch.tensor) Uncalibrated Disobind prediction.
-		cal_pred --> (torch.tensor) Calibrated Disobind prediction.
-		target --> (torch.tensor) binary output labels.
-		task --> (str) identifier for the task (interaction/interface) across all CG (1/5/10).
-
-		Returns:
-		----------
-		None
-		"""
-		print( "Creating calibration plot..." )
-
-		os.chdir( self.output_dir )
-		plot_reliabity_diagram( uncal_preds = uncal_pred.detach().cpu().numpy().flatten(), 
-								cal_preds = cal_pred.detach().cpu().numpy().flatten(), 
-								target = target, #.detach().cpu().numpy().flatten(), 
-								file_name = task )
-		os.chdir( "../" )
-
-
-
 	def create_sparsity_f1_plots( self, results_dict ):
 		"""
 		Create the plot for sparsity in dataset vs the model performance.
@@ -452,13 +683,13 @@ class JudgementDay():
 
 		sparsity = []
 		print( self.fraction_positives )
-		for key1 in self.fraction_positives.keys():
-			for key2 in self.fraction_positives[key1].keys():
-				sparsity.append( round( 1 - self.fraction_positives[key1][key2], 4 )*100 )
+		for entry_id in self.fraction_positives.keys():
+			for key2 in self.fraction_positives[entry_id].keys():
+				sparsity.append( round( 1 - self.fraction_positives[entry_id][key2], 4 )*100 )
 
 		f1 = []
 		for i in range( len( results_dict["Objective"] ) ):
-			if results_dict["Model"][i] == "Disobind_uncal":
+			if results_dict["Model"][i] == "Disobind":
 				f1.append( results_dict["F1-score"][i] )
 
 		plt.plot( sparsity, f1, marker = "o", color = "blue" )
@@ -474,84 +705,7 @@ class JudgementDay():
 
 
 
-
-	def case_specific_analysis( self ):
-		"""
-		Analysis of the top performing OOD pairs.
-
-		Input:
-		----------
-		Does not take any arguments.
-
-		Returns:
-		----------
-		None
-		"""
-		top_pairs = ["P25024:1:29--P10145:28:93_0", "P04273:95:193--P04273:95:193_0"]
-		fig, ax = plt.subplots( 8, 1, figsize = ( 15, 15 ) )
-
-		w = open( f"{self.case_specific_analysis_file}.txt", "w" )
-		i = 0
-		for entry_id in top_pairs:
-			uni_id1, uni_id2 = entry_id.split( "--" )
-			uni_id2, cp = uni_id2.split( "_" )
-			uni_id1, s1, e1 = uni_id1.split( ":" )
-			uni_id2, s2, e2 = uni_id2.split( ":" )
-
-			id_ = f"{uni_id1}--{uni_id2}_{cp}"
-
-			diso_pred = self.disobind_preds[entry_id]["interface_1"]["Disobind_uncal"]
-			diso_pred = np.where( diso_pred >= self.contact_threshold, 1, 0 )
-
-			af2_pred = self.af2m_preds[entry_id]["interface_1"]["AF2_pLDDT_PAE"]
-			print( af2_pred.shape )
-
-			af2_diso = np.stack( [diso_pred, af2_pred], axis = 1 )
-			print( af2_diso.shape )
-			af2_diso = np.max( af2_diso, axis = 1 )
-			print( af2_diso.shape )
-
-			target = np.array( self.target_cmap[entry_id] )
-			target = self.prepare_target( target, "interface_1" )
-			print( target.shape )
-
-			# Write predicted interface residues.
-			uni_pos1 = np.arange( int( s1 ), int( e1 ) + 1, 1 )
-			uni_pos2 = np.arange( int( s2 ), int( e2 ) + 1, 1 )
-
-			idx1 = np.where( af2_diso[:100] == 1 )[0]
-			idx2 = np.where( af2_diso[100:] == 1 )[0]
-
-			uni_pos1 = ranges( uni_pos1[idx1] )
-			uni_pos1 = [f"{e[0]}-{e[1]}" for e in uni_pos1]
-			uni_pos2 = ranges( uni_pos2[idx2] )
-			uni_pos2 = [f"{e[0]}-{e[1]}" for e in uni_pos2]
-			
-			w.writelines( f"{entry_id}\n" )
-			w.writelines( f"Predicted prot1 interface: {','.join( uni_pos1 )}\n" )
-			w.writelines( f"Predicted prot2 interface: {','.join( uni_pos2 )}\n" )
-
-			# Write target interface residues.
-			uni_pos1 = np.arange( int( s1 ), int( e1 ) + 1, 1 )
-			uni_pos2 = np.arange( int( s2 ), int( e2 ) + 1, 1 )
-
-			idx1 = np.where( target[:100] == 1 )[0]
-			idx2 = np.where( target[100:] == 1 )[0]
-
-			uni_pos1 = ranges( uni_pos1[idx1] )
-			uni_pos1 = [f"{e[0]}-{e[1]}" for e in uni_pos1]
-			uni_pos2 = ranges( uni_pos2[idx2] )
-			uni_pos2 = [f"{e[0]}-{e[1]}" for e in uni_pos2]
-
-			w.writelines( f"Target prot1 interface: {','.join( uni_pos1 )}\n" )
-			w.writelines( f"Target prot2 interface: {','.join( uni_pos2 )}\n" )
-
-			w.writelines( "\n-----------------------------------------------\n" )
-		w.close()
-
-
-
-	def calculate_metrics( self, pred, target, multidim_avg ):
+	def calculate_metrics( self, pred, target, multidim_avg, contact_threshold ):
 		"""
 		Calculate the following metrics:
 			Recall, Precision, F1score, AvgPrecision, MCC, AUROC, Accuracy.
@@ -567,7 +721,7 @@ class JudgementDay():
 		metric_array --> np.array containing the calculated metric values in order:
 			Recall, Precision, F1score, AvgPrecision, MCC, AUROC, Accuracy.	
 		"""
-		metrics = torch_metrics( pred, target, self.contact_threshold, multidim_avg, self.device )
+		metrics = torch_metrics( pred, target, contact_threshold, multidim_avg, self.device )
 		metric_array = np.array( [
 					metrics[0].item(),
 					metrics[1].item(),
@@ -578,7 +732,7 @@ class JudgementDay():
 					metrics[6].item()
 					] ) #.reshape( 1, 7 )
 
-		return np.round( metric_array, 3 )
+		return np.round( metric_array, 2 )
 
 
 if __name__ == "__main__":

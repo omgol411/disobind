@@ -1,26 +1,29 @@
+"""
+Assuming predictions from AF2 and AF3 already exist, obtain contact maps
+	and interface residues across all CG (1, 5, 10) for evaluation with Disobind.
+Select confidently predicted interactions based on pLDDT and PAE.
+
+Used for OOD test and Misc dataset.
+"""
+import os, json, pickle as pkl
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
 import torch
 from torch import nn
 import Bio
 from Bio.PDB import PDBParser, MMCIFParser
-import json
-import pickle as pkl
 import h5py
+
 from src.metrics import torch_metrics
 from dataset.utility import get_contact_map
 
 import warnings
 warnings.filterwarnings("ignore")
 
-"""
-Obtain AF2M predictions on the <20% test set.
-Create contact maps and calculate metrics values.
-Obtain the pLDDT and PAE too.
-"""
+
+MAX_LEN_DICT = {"ood": {19: 100}, "misc": {19: 200}}
 
 class AF2MPredictions():
 	def __init__( self ):
@@ -36,28 +39,39 @@ class AF2MPredictions():
 		# PAE cutoff for confident predictions.
 		self.pae_threshold = 5
 		# ipTM cutoff for confident predictions.
-		self.iptm_cutoff = 0.75
+		self.iptm_cutoff = 0.0
+		# Datset type.
+		self.mode = "ood" # "ood" or "misc"
 		# Max prot1/2 lengths.
-		self.max_len = 100
+		self.max_len = MAX_LEN_DICT[self.mode][self.version]
 		self.pad = True
+		# If True, get contact map from struct, else from contact_probs.
+		self.use_af3_struct = True
 		# Resolution of coarse graining.
 		self.coarse_grain_sizes = [1, 5, 10]
 		self.device = "cuda"
 		# AF2 or AF3.
 		self.af_model = "AF2"
-		
-		if self.af_model == "AF2":
-			# Dir containing AF2M predictions.
-			self.af_test_pred_dir = "AF2_preds"
+
+		if self.mode == "ood":
+			# Dir containing AF2/3 predictions.
+			self.af_test_pred_dir = f"{self.af_model}_preds"
+			# OOD set target contact maps.
+			self.cmap = h5py.File( f"{self.base_path}Target_bcmap_test_v_{self.version}.h5", "r" )		
+			# File to store AF2/3 derived contact maps for OOD set.
+			self.af_pred_dir = f"./AF_preds_v{self.version}/"
+
+		elif self.mode == "misc":
+			# Dir containing AF2/3 predictions.
+			self.af_test_pred_dir = f"{self.af_model}_misc_preds"
+			# OOD set target contact maps.
+			self.cmap = h5py.File( f"../database/Misc/misc_test_target.h5", "r" )
+			# File to store AF2/3 derived contact maps for OOD set.
+			self.af_pred_dir = f"./AF_misc_preds_v{self.version}/"
 
 		else:
-			# Dir containing AF3 predictions.
-			self.af_test_pred_dir = "AF3_preds"
+			raise ValueError( "Incorrect mode specified (ood/peds supported)..." )
 
-		# OOD set target contact maps.
-		self.cmap = h5py.File( f"{self.base_path}Target_bcmap_test_v_{self.version}.h5", "r" )		
-		# File to store AF2/3 derived contact maps for OOD set.
-		self.af_pred_dir = f"./AF_preds_v{self.version}/"
 		# Dict to store prediction results.
 		self.predictions = {}
 
@@ -118,7 +132,7 @@ class AF2MPredictions():
 		return best_model, score
 
 
-	def get_PAE_matrix( self, path ):
+	def get_PAE_matrix( self, data_file_path ):
 		"""
 		PAE provides inter-domain confidence in the predicted structure.
 
@@ -131,12 +145,12 @@ class AF2MPredictions():
 		pae --> (np.array) PAE matrix.
 		"""
 		if self.af_model == "AF2":
-			with open( path, "rb" ) as f:
+			with open( data_file_path, "rb" ) as f:
 				data = pkl.load( f )
 			pae = data["predicted_aligned_error"]
 		
 		elif self.af_model == "AF3":
-			with open( path, "rb" ) as f:
+			with open( data_file_path, "rb" ) as f:
 				data = json.load( f )
 			pae = np.array( data["pae"] )
 
@@ -197,6 +211,30 @@ class AF2MPredictions():
 		chainA, chainB = coords_dict.keys()
 		contact_map = get_contact_map( coords_dict[chainA], coords_dict[chainB], self.dist_threshold )
 
+		return contact_map
+
+
+	def get_af3_contact_map_from_probs( self, data_file_path, uni_pos1, uni_pos2 ):
+		"""
+		Obtain contact probabilities from the AF3 JSON file.
+		"""
+		start1, end1 = list( map( int, uni_pos1 ) )
+		start2, end2 = list( map( int, uni_pos2 ) )
+
+		p1_len = end1 - start1 + 1
+		p2_len = end2 - start2 + 1
+
+		with open( data_file_path, "rb" ) as f:
+			data = json.load( f )
+
+		contact_probs = np.array( data["contact_probs"] )
+
+		ur = contact_probs[:p1_len, p1_len:]
+		ll = contact_probs[p1_len:, :p1_len]
+		avg_probs = ( ur + ll.T )/2
+
+		contact_map = np.where( avg_probs >= 0.5, 1, 0 )
+		contact_map = contact_map.reshape( p1_len, p2_len )
 		return contact_map
 
 
@@ -413,12 +451,17 @@ class AF2MPredictions():
 
 			head1, head2 = key.split( "--" )
 			head2, num = head2.split( "_" )
-			uni_id1, _, _ = head1.split( ":" )
-			uni_id2, _, _ = head2.split( ":" )
+			uni_id1, start1, end1 = head1.split( ":" )
+			uni_id2, start2, end2 = head2.split( ":" )
 			header = f"{uni_id1}_{uni_id2}_{num}".lower()
 
-			# AF2 fasta file names consist of: "UniID1--UniID2_num"
-			path = f"{self.base_path}{self.af_test_pred_dir}/fold_{header}/"
+			# AF3 fasta file names consist of: "UniID1--UniID2_num"
+			if os.path.exists( f"{self.base_path}{self.af_test_pred_dir}/fold_{header}/" ):
+				path = f"{self.base_path}{self.af_test_pred_dir}/fold_{header}/"
+			elif os.path.exists( f"{self.base_path}{self.af_test_pred_dir}/{header}/" ):
+				path = f"{self.base_path}{self.af_test_pred_dir}/{header}/"
+			else:
+				raise Exception( f"AF3 output directory not found for {header}..." )
 
 			best_model, score = self.get_best_model( path, header )
 			print( f"Entry {i} Best model --> {key} \t\t {best_model} \t\t {score}" )
@@ -427,7 +470,14 @@ class AF2MPredictions():
 			
 			model_file = f"{path}fold_{header}_model_0.cif"
 			coords_dict, plddt_dict = self.get_coordinates( model_file )
-			contact_map = self.create_contact_map( coords_dict )
+			
+			if self.use_af3_struct:
+				contact_map = self.create_contact_map( coords_dict )
+			else:
+				contact_map = self.get_af3_contact_map_from_probs(
+															f"{path}/fold_{header}_full_data_0.json",
+															( start1, end1 ), ( start2, end2 )
+															)
 
 			if score[0] <= self.iptm_cutoff:
 				contact_map = np.zeros( ( contact_map.shape ) )

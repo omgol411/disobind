@@ -1,18 +1,16 @@
-### Contains helper functions for the dataset creation scripts ###
+"""
+Contains helper functions for the dataset creation scripts
 ######### ------>"May the Force serve u well..." <------##########
-##################################################################
+"""
 
 ############# One above all #############
 ##-------------------------------------##
+import os, glob, requests, time, subprocess, json
 import numpy as np
 import pandas as pd
 import h5py
-import glob
-import os
-import requests
-import time
-import subprocess
-import json
+
+import torch
 
 from transformers import BertModel, BertTokenizer
 
@@ -20,10 +18,8 @@ import Bio
 from Bio.PDB import PDBParser
 from Bio.PDB.MMCIFParser import MMCIFParser
 from Bio import SeqIO
-# from dataset.from_APIs_with_love import *
 
 import esm
-import torch
 
 
 #########################################################
@@ -156,7 +152,7 @@ def sort_by_residue_positions( df ):
 
 
 #########################################################
-def get_embeddings( emb_type, input_file, output_file ):
+def get_embeddings( emb_type, input_file, output_file, eval_ = False ):
 	"""
 	Obtain residue wise embeddings for Uniprot sequences using:
 		ProtTans, ProSE, ESM, protBERT
@@ -172,7 +168,7 @@ def get_embeddings( emb_type, input_file, output_file ):
 	None
 	"""
 	if emb_type == "T5":
-		ProtT5_embeddings( input_file, output_file )
+		ProtT5_embeddings( input_file, output_file, eval_ = eval_ )
 	elif emb_type == "ProstT5":
 		ProstT5_embeddings( input_file, output_file )
 	elif emb_type == "ProSE":
@@ -343,7 +339,7 @@ def ProstT5_embeddings( input_file, output_file ):
 	print( "\n" )
 
 
-def ProtT5_embeddings( input_file, output_file ):
+def ProtT5_embeddings( input_file, output_file, eval_ = False ):
 	"""
 	Obtain the ProtT embeddings for the Uniprot sequences.
 		Embedding size: [N, 1024]
@@ -361,11 +357,11 @@ def ProtT5_embeddings( input_file, output_file ):
 
 	print( "Generating ProtT5 embeddings..." )
 	#  (TODO for later) Clean this path issue.
-	T5_dir = os.path.abspath( "ProtTrans/Embedding/" ) # Use for inference.
-	# T5_dir = "../ProtTrans/Embedding/" # Use while creating embedding for training and analysis.
+	if eval_:
+		T5_dir = os.path.abspath( "ProtTrans/Embedding/" ) # Use for inference.
+	else:
+		T5_dir = "../ProtTrans/Embedding/" # Use while creating embedding for training and analysis.
 	main_dir = "../../dataset/"
-	# input_file = f"../../Scripts/{input_file}"
-	# output_file = f"../../Scripts/{output_file}"
 
 	os.chdir( T5_dir )
 	subprocess.call( ["python", 

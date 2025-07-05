@@ -43,6 +43,7 @@ class Trainer (nn.Module):
 		self.max_epochs = config.max_epochs
 		self.threshold = config.contact_threshold
 		self.device = device
+		self.max_len = config.max_seq_len
 		self.prec = 4    # Significant figures.
 
 
@@ -121,20 +122,21 @@ class Trainer (nn.Module):
 		p1_emb --> tensor of shape (N, L1, C )
 		p2_emb --> tensor of shape (N, L2, C ) 
 		"""
-		target = batch[:,:,-200:]
+		target = batch[:,:,-2*self.max_len:]
 		# Separate the target and mask.
-		target, target_mask = target[:,:,:100], target[:,:,100:]
+		target, target_mask = target[:,:,:self.max_len], target[:,:,self.max_len:]
 
 		if self.emb_type == "ProSE":
-			p1_emb, p2_emb = batch[:,:,:6165], batch[:,:,6165:-200]
+			p1_emb, p2_emb = batch[:,:,:6165], batch[:,:,6165:-2*self.max_len]
 		elif self.emb_type in ["T5", "ProstT5", "BERT"]:
-			p1_emb, p2_emb = batch[:,:,:1024], batch[:,:,1024:-200]
+			p1_emb, p2_emb = batch[:,:,:1024], batch[:,:,1024:-2*self.max_len]
 		elif self.emb_type == "ESM2-650M":
-			p1_emb, p2_emb = batch[:,:,:1280], batch[:,:,1280:-200]
+			p1_emb, p2_emb = batch[:,:,:1280], batch[:,:,1280:-2*self.max_len]
 		else:
 			raise Exception( "Incorrect embedding used..." )
 
-		p1_emb, p2_emb, target, target_mask = prepare_input( prot1 = p1_emb, prot2 = p2_emb, target = target, 
+		( p1_emb, p2_emb, target,
+			target_mask, interaction_mask ) = prepare_input( prot1 = p1_emb, prot2 = p2_emb, target = target, 
 															target_mask = [self.mask[1], target_mask], 
 															objective = self.objective[0], 
 															bin_size = self.objective[1], 
@@ -145,8 +147,9 @@ class Trainer (nn.Module):
 		p2_emb = p2_emb.to( self.device ).float()
 		target = target.to( self.device ).float()
 		target_mask = target_mask.to( self.device ).float()
+		interaction_mask = interaction_mask.to( self.device ).float()
 
-		return p1_emb, p2_emb, target, target_mask
+		return p1_emb, p2_emb, target, target_mask, interaction_mask
 
 
 
@@ -165,9 +168,9 @@ class Trainer (nn.Module):
 		target --> target for the minibatch.
 		target_mask --> binary mask for ignoring contribution from padding.
 		"""
-		p1_emb, p2_emb, target, target_mask = self.get_inputs( batch )
+		p1_emb, p2_emb, target, target_mask, interaction_mask = self.get_inputs( batch )
 
-		preds = self.model1( p1_emb, p2_emb )
+		preds = self.model1( p1_emb, p2_emb, interaction_mask )
 
 		del p1_emb, p2_emb
 		return preds, target, target_mask
@@ -207,14 +210,13 @@ class Trainer (nn.Module):
 			preds = preds*target_mask
 		metrics = torch_metrics( preds, target, self.threshold, self.multidim_avg, self.device )
 
-
 		preds = preds.detach().cpu().numpy()
 		target = target.detach().cpu().numpy()
 		return loss, metrics, preds, target, target_mask
 
 
 
-	def training_step ( self, train_set, epoch ):
+	def training_step( self, train_set, epoch ):
 		"""
 		Perform forward pass for all mini-batches in training set.
 
@@ -476,7 +478,8 @@ class Trainer (nn.Module):
 			plot_reliabity_diagram( [], cal_preds, target, file_name )
 
 		elif self.method == "None":
-			plot_reliabity_diagram( uncal_preds, [], target, file_name )
+			pass
+			# plot_reliabity_diagram( uncal_preds, [], target, file_name )
 		
 		else:
 			plot_reliabity_diagram( uncal_preds, cal_preds, target, file_name )
@@ -583,9 +586,9 @@ class Trainer (nn.Module):
 
 		if "interaction" in self.objective[0]:
 			if "bin" in self.objective[0]:
-				length = 100//self.objective[1]
+				length = self.max_len//self.objective[1]
 			else:
-				length = 100
+				length = self.max_len
 			test_pred = test_pred.reshape( -1, length, length )
 			test_target = test_target.reshape( -1, length, length )
 

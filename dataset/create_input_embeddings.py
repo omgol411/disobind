@@ -19,7 +19,7 @@ class Embeddings():
 	def __init__( self, scope = None, embedding_type = None, uniprot_seq = None,
 					base_path = None, 
 					fasta_file = None, emb_file = None,
-					headers = None, load_cmap = True ):
+					headers = None, load_cmap = True, eval_ = False ):
 		"""
 		Constructor
 		"""
@@ -28,7 +28,7 @@ class Embeddings():
 		# Set seed for all PRNGs.
 		self.seed_worker()
 		# Version for the dataset directory.
-		self.version = 19
+		self.version = 21
 		# self.imbl_sampler = None  # ["None", "smote", "adasyn"]  # Deprectaed
 		# Whether to create global or local embeddings.
 		self.scope = "global" if scope == None else scope
@@ -40,8 +40,8 @@ class Embeddings():
 		self.partitions = [0.9, 0.05, 0.05]
 		# Max length for prot1/2.
 		self.max_len = 100
-		# Length of flanking region to be consider for global embeddings.
-		self.flanking_region = None
+		# If True, specifies path to get T5 embeddings at inference.
+		self.eval = eval_
 
 		# Dict to store prot1/2 embeddings with the entry_id as the key.
 		self.p1_frag_emb = {}
@@ -258,7 +258,7 @@ class Embeddings():
 
 		if not os.path.exists( self.emb_file ):
 			print( "Creating prot1 embeddings..." )
-			get_embeddings( self.embedding_type, self.fasta_file, self.emb_file )
+			get_embeddings( self.embedding_type, self.fasta_file, self.emb_file, self.eval )
 
 		else:
 			print( "Embeddings for prot1/2 already exists..." )

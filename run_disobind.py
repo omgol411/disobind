@@ -1,22 +1,27 @@
-########## Make predictions using pre-trained models. ##########
+"""
 ######## ------>"May the Force serve u well..." <------#########
-################################################################
+Script to obtain Disobind or Disobind+AF2 predictions for a user.
+Inputs:
+	Disobind needs the UniProt IDs for both the proteins and the protein 1 (1st in the pair) must be an IDR.
+	The input must be provided in a csv file formatas shown below:
+	For Disobind only
+		Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2
+	For Disobind+AF2
+		Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2,end_res2,af2_struct_file,af2_json_file,chain1,chain2,offset1,offset2
+
+Outputs:
+	Disobind, AF2, AF2+Disobind predictions for all tasks and all CG resolutions.
+"""
 
 ############# One above all #############
 ##-------------------------------------##
+import math, os, subprocess, argparse, json, time, pickle as pkl
+import warnings
 import numpy as np
 import pandas as pd
-import math
 from omegaconf import OmegaConf
-import os
-import subprocess
-import argparse
-import json
-import time
-import joblib
-import tqdm
 from multiprocessing import Pool
-import pickle as pkl
+import tqdm
 import Bio
 from Bio.PDB import PDBParser, MMCIFParser
 
@@ -35,26 +40,13 @@ from src.utils import prepare_input
 from analysis.params import parameter_files
 
 
-"""
-Script to obtain Disobind or Disobind+AF2 predictions for a user.
-Inputs:
-	Disobind needs the UniProt IDs for both the proteins and the protein 1 (1st in the pair) must be an IDR.
-	The input must be provided in a csv file formatas shown below:
-	For Disobind only
-		Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2
-	For Disobind+AF2
-		Uni_ID1,start_res1,end_res1,Uni_ID2,start_res2,end_res2,af2_struct_file,af2_json_file,chain1,chain2,offset1,offset2
-
-Outputs:
-	Disobind, AF2, AF2+Disobind predictions for all tasks and all CG resolutions.
-"""
-
 class Disobind():
 	def __init__( self, args ):
 		"""
-		Constructor
+		Get Disobind or Disobind+AF2 predictions for an input pairs of proteins,
+			at least one of which is an IDR.
 		"""
-		# Input file containing the prot1/2 headers.
+		# Input file containing the prot1/2 entry_ids.
 		self.input_file = args.f
 		# No. of CPU cores for parallelism.
 		self.cores = args.c
@@ -71,8 +63,6 @@ class Disobind():
 		self.scope = "global"
 		# Device to be used for running Disobind.
 		self.device = args.d
-		# Max protein length.
-		self.max_len = 100
 		# Contact probability threshold.
 		self.threshold = 0.5
 		# Distance cutoff for defining a contact.
@@ -86,7 +76,7 @@ class Disobind():
 		# Objective settings to be used for prediction.
 		self.objective = ["", "", "", ""]
 		# Load a dict storing paths for each model.
-		self.parameters = parameter_files()
+		self.parameters = parameter_files( 19 )
 		# Dict to store predictions for all tasks.
 		self.predictions = {}
 
@@ -123,9 +113,9 @@ class Disobind():
 			For predict mode,
 				Download the sequences.
 		"""
-		headers, af_dict = self.read_csv_input()
+		entry_ids, af_dict = self.read_csv_input()
 
-		prot_pairs = self.process_input_pairs( headers )
+		prot_pairs = self.process_input_pairs( entry_ids )
 
 		self.get_predictions( prot_pairs, af_dict )
 
@@ -151,6 +141,11 @@ class Disobind():
 			raise ValueError( "Incorrect coarse-grained resolution specified. \n" + 
 								"Choose from [0, 1, 5, 10]..." )
 
+		if self.required_cg in [5, 10]:
+			warnings.warn( f"\n\033[1m Using coarse-grained model with kernel size = {cg}.\033[0m\n"+
+							f"\033[1m C-terminal residues would be lost if protein length\033[0m"+
+							"\033[1m is not a multiple of kernel size...\n\033[0m" )
+
 		for obj in ["interaction", "interface"]:
 			if obj == "interaction" and not self.predict_cmap:
 				continue
@@ -162,7 +157,7 @@ class Disobind():
 				elif cg == self.required_cg:
 					tasks.append( f"{obj}_{cg}" )
 
-		print( f"Running Disobind for the followinng tasks: \n{tasks}" )
+		print( f"\033[1mRunning Disobind for the followinng tasks: \n{tasks}\033[0m" )
 		return tasks
 
 
@@ -223,9 +218,9 @@ class Disobind():
 
 		Returns:
 		----------
-		headers --> list of entry_ids for al binary complexes.
+		entry_ids --> list of entry_ids for al binary complexes.
 		"""
-		headers = []
+		entry_ids = []
 		af_dict = {}
 		with open( self.input_file, "r" ) as f:
 			input_pairs = f.readlines()
@@ -247,7 +242,7 @@ class Disobind():
 				raise ValueError( f"Incorrect input format..." )
 
 			entry_id = f"{uni_id1}:{start1}:{end1}--{uni_id2}:{start2}:{end2}_0"
-			headers.append( entry_id )
+			entry_ids.append( entry_id )
 			af_dict[entry_id] = {
 						"struct_file": af_struct_file,
 						"json_file": af_json_file,
@@ -257,7 +252,7 @@ class Disobind():
 										 }
 									}
 
-		return headers, af_dict
+		return entry_ids, af_dict
 
 
 ###################################################################################
@@ -282,12 +277,12 @@ class Disobind():
 		return uni_id, seq
 
 
-	def get_unique_uni_ids( self, headers ):
+	def get_unique_uni_ids( self, entry_ids ):
 		"""
 		Given a list of all protein pairs, get all the unique Uniprot IDs.
 		"""
 		unique_uni_ids = []
-		for head in headers:
+		for head in entry_ids:
 			head1, head2 = head.split( "--" )
 			uni_id1 = head1.split( ":" )[0]
 			uni_id2 = head2.split( ":" )[0]
@@ -301,20 +296,20 @@ class Disobind():
 
 
 
-	def download_uniprot_seq( self, headers ):
+	def download_uniprot_seq( self, entry_ids ):
 		"""
 		Obtain all unique UniProt IDs in the provided input.
 		Download all unique UniProt sequences.
 
 		Input:
 		----------
-		headers --> list of entry_id for a binary complexes.
+		entry_ids --> list of entry_id for a binary complexes.
 
 		Returns:
 		----------
 		None
 		"""
-		unique_uni_ids = self.get_unique_uni_ids( headers )
+		unique_uni_ids = self.get_unique_uni_ids( entry_ids )
 
 		with Pool( self.cores ) as p:
 			for result in tqdm.tqdm( p.imap_unordered( 
@@ -335,14 +330,14 @@ class Disobind():
 ###################################################################################
 ##-------------------------------------------------------------------------------##
 ###################################################################################
-	def process_input_pairs( self, headers ):
+	def process_input_pairs( self, entry_ids ):
 		"""
 		For all input pairs, convert them into a uniform format:
 			UniID1:start1:end1--UniID2:start2:end2_num
 
 		Input:
 		----------
-		headers --> list of entry_id for a binary complexes.
+		entry_ids --> list of entry_id for a binary complexes.
 
 		Returns:
 		----------
@@ -350,7 +345,7 @@ class Disobind():
 		"""
 		print( "\nDownloading UniProt sequences..." )
 		if not os.path.exists( self.uni_seq_file ):
-			self.download_uniprot_seq( headers )
+			self.download_uniprot_seq( entry_ids )
 
 			with open( self.uni_seq_file, "w" ) as w:
 				json.dump( self.uniprot_seq, w )
@@ -359,7 +354,7 @@ class Disobind():
 				self.uniprot_seq = json.load( f )
 
 		prot_pairs = []
-		for head in headers:
+		for head in entry_ids:
 			head1, head2 = head.split( "--" )
 			uni_id1, start1, end1 = head1.split( ":" )
 			uni_id2, start2, end2 = head2.split( ":" )
@@ -377,14 +372,14 @@ class Disobind():
 ###################################################################################
 ##-------------------------------------------------------------------------------##
 ###################################################################################
-	def create_embeddings( self, headers ):
+	def create_embeddings( self, entry_ids ):
 		"""
 		Use the Shredder() class to:
 			Create fasta files and get embeddings.
 
 		Input:
 		----------
-		headers --> list of entry_id for a binary complexes.
+		entry_ids --> list of entry_id for a binary complexes.
 
 		Returns:
 		----------
@@ -394,8 +389,9 @@ class Disobind():
 													uniprot_seq = self.uniprot_seq, base_path = self.output_dir, 
 													fasta_file = self.fasta_file, 
 													emb_file = self.emb_file, 
-													headers = headers, 
-													load_cmap = False
+													headers = entry_ids, 
+													load_cmap = False,
+													eval_ = True
 													 ).initialize( return_emb = True )
 
 
@@ -498,36 +494,28 @@ class Disobind():
 		target --> (torch.tensor) contact map of dimension [N, L1, L2].
 			If padding, L1 == L2; N = 1.
 		target_mask --> (torch.tensor) binary mask of dimension [N, L1, L2].
+		interaction_mask --> (torch.tensor) binary mask to
+							ignore pads in interface_block [N, L1, L2].
 		eff_len --> effective length of prot1/2 (eff_len) post coarse graining.
-		"""		
+		"""
 		num_res1 = prot1.shape[0]
 		num_res2 = prot2.shape[0]
-		# print( num_res1, "  ", num_res2, "  ", prot1.shape, "  ", key )
 
-		eff_len = self.max_len//self.objective[1]
-		eff_len = [eff_len, eff_len]
-		
-		mask1 = np.zeros( ( self.max_len, 1024 ) )
-		mask2 = np.zeros( ( self.max_len, 1024 ) )
+		if self.objective[1] == 1:
+			eff_len = [num_res1, num_res2]
+		else:
+			cg = self.objective[1]
+			eff_len = [num_res1//cg, num_res2//cg]
 
-		mask1[:num_res1, :] = prot1
-		mask2[:num_res2, :] = prot2
+		target_mask = np.ones( ( 1, num_res1, num_res2 ) )
 
-		prot1 = mask1
-		prot2 = mask2
-
-		target_mask = np.zeros( ( 1, self.max_len, self.max_len ) )
-		target_mask[:, :num_res1,:num_res2] = 1
-		target_padded = np.copy( target_mask )
-		target = target_padded
-
-		target = torch.from_numpy( target )
 		target_mask = torch.from_numpy( target_mask )
 
-		prot1 = torch.from_numpy( prot1 ).unsqueeze( 0 )
-		prot2 = torch.from_numpy( prot2 ).unsqueeze( 0 )
+		prot1 = torch.from_numpy( prot1 ).unsqueeze( 0 ).float()
+		prot2 = torch.from_numpy( prot2 ).unsqueeze( 0 ).float()
 
-		prot1, prot2, target, target_mask = prepare_input( prot1, prot2, None, 
+		( prot1, prot2, target,
+			target_mask, interaction_mask ) = prepare_input( prot1, prot2, None, 
 															[True, target_mask], 
 															objective = self.objective[0], 
 															bin_size = self.objective[1], 
@@ -535,10 +523,10 @@ class Disobind():
 															single_output = self.objective[3] )
 		prot1 = prot1.to( self.device ).float()
 		prot2 = prot2.to( self.device ).float()
-		target_mask = target_mask.to( self.device )
+		target_mask = target_mask.to( self.device ).float()
+		interaction_mask = interaction_mask.to( self.device ).float()
 
-		return prot1, prot2, target, target_mask, eff_len
-
+		return prot1, prot2, target, target_mask, interaction_mask, eff_len
 
 
 	def predict( self, required_tasks, af_dict ):
@@ -549,8 +537,12 @@ class Disobind():
 				pair_id: {
 						entry_id: {
 							{obj}_{cg}: {
-									"Disobind_uncal",
-									"Final preds",
+									"Disobind_preds",
+									"AF2_preds",
+									"Diso+AF2_preds",
+									"Final_Disobind preds",
+									"Final_AF2 preds",
+									"Final_Diso+AF2 preds"
 							}
 						}
 				}
@@ -576,7 +568,6 @@ class Disobind():
 			head2, num = head2.split( "_" )
 			uni_id1, start1, end1 = head1.split( ":" )
 			uni_id2, start2, end2 = head2.split( ":" )
-			# header = f"{uni_id1}--{uni_id2}_{num}"
 
 			# Pair does not have the _0 at the end.
 			pair_id = f"{uni_id1}::--{uni_id2}::"
@@ -598,25 +589,26 @@ class Disobind():
 					
 					model = self.apply_settings( obj, cg )
 
-					prot1, prot2, target, target_mask, eff_len = self.get_input_tensors( 
-																						prot1 = prot1_emb, 
-																						prot2 = prot2_emb )
+					( prot1, prot2, target,
+						target_mask, interaction_mask,
+						eff_len ) = self.get_input_tensors( prot1 = prot1_emb, 
+															prot2 = prot2_emb )
 					
 					# Get model predictions.
 					with torch.no_grad():
-						uncal_output = model( prot1, prot2 )
+						output = model( prot1, prot2, interaction_mask )
 						
-						uncal_output = uncal_output*target_mask
+						# output = output*target_mask
 					
-					uncal_output = uncal_output.detach().cpu().numpy()
-					target_mask = target_mask.detach().cpu().numpy()
+					output = output.detach().cpu().numpy()
+					# target_mask = target_mask.detach().cpu().numpy()
 
 					# Shape must be [m, n] --> m and n are padded lengths of prot1/2.
 					if "interaction" in self.objective[0]:
-						uncal_output = uncal_output.reshape( eff_len )
+						output = output.reshape( eff_len )
 					# Shape must be [m+n, 1].
 					elif "interface" in self.objective[0]:
-						uncal_output = uncal_output.reshape( 2*eff_len[0], 1 )
+						output = output.reshape( sum( eff_len ), 1 )
 
 					_, cg = cg.split( "_" )
 
@@ -635,13 +627,19 @@ class Disobind():
 						af2_pred = self.process_af2_pred( af2_pred )
 
 						# Get Disobind+AF2 output.
-						m, n = uncal_output.shape
+						m, n = output.shape
 						# Here Disobind output is not binary. But doesn't matter as we are just taking a max.
-						diso_af2 = np.stack( [uncal_output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
+						diso_af2 = np.stack( [output.reshape( -1 ), af2_pred.reshape( -1 )], axis = 1 )
 						diso_af2 = np.max( diso_af2, axis = 1 ).reshape( m, n )
 
-						af2_pred, df_af2 = self.extract_model_output( entry_id, af2_pred, eff_len, "af2" )
-						diso_af2, df_diso_af2 = self.extract_model_output( entry_id, diso_af2, eff_len, "diso_af2" )
+						af2_pred, df_af2 = self.extract_model_output( entry_id,
+																		af2_pred,
+																		eff_len,
+																		"af2" )
+						diso_af2, df_diso_af2 = self.extract_model_output( entry_id,
+																			diso_af2,
+																			eff_len,
+																			"diso_af2" )
 
 					else:
 						diso_af2 = np.array( [] )
@@ -649,10 +647,10 @@ class Disobind():
 						df_af2 = pd.DataFrame( {} )
 						df_diso_af2 = pd.DataFrame( {} )
 
-					uncal_output, df_diso = self.extract_model_output( entry_id, uncal_output, eff_len, "diso" )
+					output, df_diso = self.extract_model_output( entry_id, output, eff_len, "diso" )
 
 					predictions[pair_id][entry_id][f"{obj}_{cg}"] = {
-																	"Disobind": np.float32( uncal_output ),
+																	"Disobind": np.float32( output ),
 																	"AF2": np.float32( af2_pred ),
 																	"Diso+AF2": np.float32( diso_af2 ),
 																	"Final_diso_preds": df_diso,
@@ -677,7 +675,8 @@ class Disobind():
 		"""
 		if self.objective[1] > 1:
 			m = nn.MaxPool2d( kernel_size = self.objective[1], stride = self.objective[1] )
-			af2_pred = m( torch.from_numpy( af2_pred ).unsqueeze( 0 ).unsqueeze( 0 ) )
+			af2_pred = torch.from_numpy( af2_pred ).float()
+			af2_pred = m( af2_pred.unsqueeze( 0 ).unsqueeze( 0 ) )
 			af2_pred = af2_pred.squeeze( [0, 1] ).numpy()
 
 		if "interface" in self.objective[0]:
@@ -725,7 +724,10 @@ class Disobind():
 			beads1 = np.array( list( map( str, beads1 ) ) )
 			beads2 = np.arange( start2, end2 + 1, 1 ) 
 			beads2 = np.array( list( map( str, beads2 ) ) )
-		
+
+			p1_cg_len = len_p1
+			p2_cg_len = len_p2
+
 		else:
 			beads1, beads2 = [], []
 			for s in np.arange( start1, end1 + 1, cg ):
@@ -738,19 +740,19 @@ class Disobind():
 				beads2.append( f"{s}-{e}" )
 			beads2 = np.array( beads2 )
 
-			# H_out = ( ( H_in + 2*padding - dilation( kernel_size - 1 ) )/stride ) + 1
-			# For us padding = 0 and dilation = 1.
-			if len_p1 == 100:
-				len_p1 = ( ( len_p1 - ( cg - 1 ) )//cg ) + 1
-			else:
-				len_p1 = math.ceil( ( ( len_p1 - ( cg - 1 ) )/cg ) + 1 )
+			# H_out = ( ( H_in + 2*padding - dilation( kernel_size - 1 ) )/stride )
+			# For us padding = 0, dilation = 1, and kernel_size = stride = cg.
+			# if len_p1 == 100:
+			# 	p1_cg_len = ( ( len_p1 - ( cg - 1 ) )//cg )
+			# else:
+			p1_cg_len = math.ceil( ( ( len_p1 - ( cg - 1 ) )/cg ) )
 			
-			if len_p2 == 100:
-				len_p2 = ( ( len_p2 - ( cg - 1 ) )//cg ) + 1
-			else:
-				len_p2 = math.ceil( ( ( len_p2 - ( cg - 1 ) )/cg ) + 1 )
+			# if len_p2 == 100:
+			# 	p2_cg_len = ( ( len_p2 - ( cg - 1 ) )//cg )
+			# else:
+			p2_cg_len = math.ceil( ( ( len_p2 - ( cg - 1 ) )/cg ) )
 
-		return len_p1, beads1, len_p2, beads2
+		return p1_cg_len, beads1, p2_cg_len, beads2
 
 
 	def extract_model_output( self, entry_id: str, output: np.array, eff_len: List, name: str ):
@@ -777,7 +779,7 @@ class Disobind():
 		prot1, prot2 = entry_id.split( "--" )
 		prot2, _ = prot2.split( "_" )
 
-		len_p1, beads1, len_p2, beads2 = self.get_beads( cg, prot1, prot2 )
+		p1_cg_len, beads1, p2_cg_len, beads2 = self.get_beads( cg, prot1, prot2 )
 		
 		if "interaction" in obj:
 			output = output[:len_p1, :len_p2]
@@ -797,17 +799,10 @@ class Disobind():
 				df["Residue2"] = []
 
 		elif "interface" in  obj:
-			m = eff_len[0]
-			if output.shape != ( 2*m, 1 ):
-				raise ValueError( f"Incorrect shape of output {output.shape}." +
-								f"Must be ( {2*m}, 1 )" )
-			
-			# 1st m residues belong to prot1.
-			interface1 = output[:m]
-			interface1 = interface1[:len_p1]
-			# Last m residues belong to prot2.
-			interface2 = output[m:]
-			interface2 = interface2[:len_p2]
+			# prot1 residues are first.
+			interface1 = output[:p1_cg_len]
+			interface2 = output[p1_cg_len:]
+
 			idx1 = np.where( interface1 >= self.threshold )[0]
 			idx2 = np.where( interface2 >= self.threshold )[0]
 
@@ -830,7 +825,6 @@ class Disobind():
 		return output, df
 
 
-
 ###################################################################################
 ##-------------------------------------------------------------------------------##
 ###################################################################################
@@ -843,8 +837,6 @@ class AfPrediction():
 		self.chains = required_chains["chains"]
 		self.offsets = list( map( int, required_chains["offsets"] ) )
 
-		# Max length for pad.
-		self.max_len = 100
 		# Distance threshold in (Angstorm) to define a contact between residue pairs.
 		self.dist_threshold = 8
 		# pLDDt cutoff to consider a confident prediction.
@@ -1173,10 +1165,10 @@ class AfPrediction():
 		plddt_matrix, pae = self.apply_confidence_cutoffs( plddt1, plddt2, pae )
 		confident_interactions = contact_map * plddt_matrix * pae
 
-		m, n = confident_interactions.shape
-		pad = np.zeros( ( self.max_len, self.max_len ) )
-		pad[:m, :n] = confident_interactions
-		confident_interactions = pad
+		# m, n = confident_interactions.shape
+		# pad = np.zeros( ( self.max_len, self.max_len ) )
+		# pad[:m, :n] = confident_interactions
+		# confident_interactions = pad
 
 		return confident_interactions
 

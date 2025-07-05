@@ -44,16 +44,16 @@ class Dataset ():
 		self.tim = time.time()   # Just for calculating total time.
 		self.version = version
 		self.base_path = f"../database/v_{self.version}"
-		self.dataset_version = "100_20_0.2"
+		self.dataset_version = "200_20_0.2"
 		# Dir containing PDB/CIF files.
 		self.pdb_path = "../Combined_PDBs/"
 		# Name of file storing Uniprot sequences.
 		self.uni_seq_file_name = "Uniprot_seq"
 		self.uni_seq_path = f"../Disobind_dataset_{self.dataset_version}/{self.uni_seq_file_name}.json"
 		# Dir storing binary complexes created by previous script.
-		self.binary_complexes_dir = f"../Disobind_dataset_{self.dataset_version}/Binary_complexes/"
+		self.binary_complexes_dir = f"../Disobind_dataset_{self.dataset_version}/Binary_complexes_None/"
 		# File containing keys for binary complexes created by previous script.
-		self.binary_complexes_file = f"../Disobind_dataset_{self.dataset_version}/Binary_complexes.txt"
+		self.binary_complexes_file = f"../Disobind_dataset_{self.dataset_version}/Binary_complexes_None.txt"
 		# Dir to store the valid binary complexes.
 		self.valid_binary_complexes_dir = "./Valid_Binary_Complexes/"
 		# Dir to store the logs for obtaiing valid binary complexes.
@@ -81,7 +81,7 @@ class Dataset ():
 		# Min length of protein seq.
 		self.min_len = 20
 		# Size of the first batch - module1.
-		self.m1_first_batch  = 13000
+		self.m1_first_batch  = 11000
 		# Size of the all subsequent batches - module1.
 		self.m1_batch_size = 50
 		# Batch size - module3.
@@ -424,7 +424,7 @@ class Dataset ():
 				models = load_PDB( pdb, self.pdb_path )
 				all_indexes = data.index
 				for i in all_indexes:
-					if len( data["PDB positions1"][i] ) > 100 or len( data["PDB positions2"][i] ) > 100:
+					if len( data["PDB positions1"][i] ) > self.max_len or len( data["PDB positions2"][i] ) > self.max_len:
 						print( upid, "  ", pdb, "  ", data["Auth Asym ID1"][i] )
 						print( len( data["PDB positions1"][i] ), "  ", len( data["PDB positions2"][i] ) )
 						raise Exception( "Chains longer than max_len...\n" )
@@ -475,6 +475,9 @@ class Dataset ():
 		
 		# Load if the upid has already been processed.
 		else:
+			with open( f"{self.valid_binary_complexes_logs_dir}{upid}.json", "r" ) as f:
+				logs_dict = json.load( f )
+			
 			# A h5 file will be saved only if the upid had at least 1 valid binary complex else not.
 			if os.path.exists( f"{self.valid_binary_complexes_dir}{upid}.h5" ):
 				valid_df = pd.read_hdf( f"{self.valid_binary_complexes_dir}{upid}.h5", dtype = self.dtype_dict )
@@ -482,8 +485,6 @@ class Dataset ():
 			else:
 				count_binary_complexes = 0
 				upid = None
-			with open( f"{self.valid_binary_complexes_logs_dir}{upid}.json", "r" ) as f:
-				logs_dict = json.load( f )
 
 
 		return [upid, total_binary_complexes, count_binary_complexes, logs_dict]
@@ -1030,8 +1031,7 @@ class Dataset ():
 				hf.create_dataset( "merged_entries", data = accepted_entries )
 				hf.create_dataset( "merged_entries_count", data = len( accepted_entries ) )
 				hf.create_dataset( "summed_cmap", data = merged_cmap )
-				print( merged_cmap )
-				exit()
+				
 				merged_cmap = np.where( merged_cmap > 0, 1, 0 )
 				hf.create_dataset( "contacts_count", data = np.count_nonzero( merged_cmap ) )
 				hf.create_dataset( "binary_cmap", data = merged_cmap )

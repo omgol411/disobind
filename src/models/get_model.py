@@ -14,6 +14,7 @@ def get_model( config ):
 			bias = config.bias,
 			dropouts = config.dropouts,
 			norm = config.norm,
+			max_len = config.max_seq_len,
 			activation1 = config.activation1,
 			activation2 = config.activation2,
 			temperature = config.temperature,

@@ -1,23 +1,18 @@
-### Helper functions to fetch data from web servers, APIs ###
+"""
+Helper functions to fetch data from web servers, APIs
 ####### ------>"May the Force serve u well..." <------#######
-#############################################################
+"""
 
 ############# One above all #############
 ##-------------------------------------##
+import requests, wget, json, time, os, subprocess
+from io import StringIO
 import numpy as np
 import pandas as pd
-import subprocess
-import os
 
-import requests
-import wget
-from io import StringIO
 from Bio import SeqIO
 from Bio.PDB import PDBParser
 from Bio.PDB.MMCIFParser import MMCIFParser
-import json
-import time
-
 
 ##########################################
 ##--------------------------------------##
@@ -139,11 +134,9 @@ def get_uniprot_entry_name( uni_id, max_trials = 10, wait_time = 5 ):
 		
 		if data == None:
 			return None
-			break
 
 		elif data == 0:
 			return None
-			break
 		
 		else:
 			if "recommendedName" in data["proteinDescription"].keys():
@@ -156,7 +149,6 @@ def get_uniprot_entry_name( uni_id, max_trials = 10, wait_time = 5 ):
 				continue
 			else:
 				return prot_name
-				break
 
 # print( get_uniprot_entry_name( "A2ARV4" ) ) # Q6LD08, P04150, Q8PJB5, Q6LD08, P0DJZ2
 # exit()
@@ -420,7 +412,6 @@ def download_pdb( pdb_id, max_trials = 5, wait_time = 5, return_id = True ):
 			if success:
 					if pdb_valid( file_name, "cif" ):
 						return ["cif", pdb_id] if return_id else "cif"
-						break
 
 					elif trial != ( max_trials - 1 ):
 						continue
@@ -434,7 +425,6 @@ def download_pdb( pdb_id, max_trials = 5, wait_time = 5, return_id = True ):
 				if success:
 					if pdb_valid( file_name, "pdb" ):
 						return ["pdb", pdb_id] if return_id else "pdb"
-						break
 			
 					elif trial != ( max_trials - 1 ):
 						continue
@@ -444,7 +434,7 @@ def download_pdb( pdb_id, max_trials = 5, wait_time = 5, return_id = True ):
 
 		except Exception as e:
 			if trial == ( max_trials - 1 ):
-				break
+				return [None, pdb_id] if return_id else None
 			else:
 				time.sleep( wait_time )
 				continue
@@ -560,7 +550,6 @@ def sifts_map_shell_command( pdb, max_trials = 10, wait_time = 5 ):
 	w = open( script_name, "w" )
 	w.writelines( "#!/bin/bash \n" ) 
 	w.writelines( "pdb=$1 \n" )
-	# w.writelines( "curl --silent ftp://ftp.ebi.ac.uk/pub/databases/msd/sifts/xml/$pdb.xml.gz | gunzip | python parse_sifts.py > $pdb.tsv") --> Deprecated SIFTS url.
 	w.writelines( "curl --silent https://www.ebi.ac.uk/pdbe/files/sifts/$pdb.xml.gz | gunzip | python parse_sifts.py > $pdb.tsv" )
 	w.close()
 
@@ -573,7 +562,6 @@ def sifts_map_shell_command( pdb, max_trials = 10, wait_time = 5 ):
 	for i in range( 1, max_trials ):			
 		try:
 			subprocess.call( ["sh", script_name, f"{pdb}"] )
-			# subprocess.call( ["gunzip", f"{pdb}.xml.gz", "|", "python", "parse_sifts.py", ">", f"{pdb}.tsv"] )
 			mapping = pd.read_csv( f"{pdb}.tsv", sep="\t" )
 			success = True
 			break
@@ -880,8 +868,7 @@ def from_pdb_rest_api_with_love( entry_id, max_trials = 10, wait_time = 5, custo
 				entity_dict[entity_id] = get_pdb_entity_info( entry_id, entity_id, max_trials = max_trials, wait_time = wait_time )
 
 				if entity_dict[entity_id] == "not_found":
-					return None #TODO return before break? 
-					break
+					return None
 
 			# Count all chains that exist in the PDB - protein and non-protein.
 			total_chains += len( entity_dict[entity_id]["rcsb_polymer_entity_container_identifiers"]["asym_ids"] )
@@ -952,11 +939,15 @@ def get_superseding_pdb_id( pdb_id, max_trials = 10, wait_time = 5 ):
 		# break
 
 	else:
-		new_pdb_id = data["rcsb_repository_holdings_removed"]["id_codes_replaced_by"][0]
+		if "id_codes_replaced_by" in data["rcsb_repository_holdings_removed"].keys():
+			new_pdb_id = data["rcsb_repository_holdings_removed"]["id_codes_replaced_by"][0]
+		# If PDB ID has become obsolete and no new ID has been assigned (e.g. 8fg2).
+		else:
+			new_pdb_id = None
 
 	return new_pdb_id
 
-# print( get_superseding_pdb_id( "5v8h" ) )
+# print( get_superseding_pdb_id( "8fg2" ) )
 # exit()
 
 

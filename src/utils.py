@@ -155,6 +155,9 @@ def prepare_input( prot1, prot2, target, target_mask, objective, bin_size, bin_i
 	else:
 		eff_len = max_len
 
+	# For masking pads in the interaction_tensor in model.
+	interaction_mask = target_mask.clone().unsqueeze( -1 )
+
 	if "interaction" in objective:
 		# target: ( N, L1, L2 ) --> ( N, L1xL2 )
 		if target != None:
@@ -199,7 +202,7 @@ def prepare_input( prot1, prot2, target, target_mask, objective, bin_size, bin_i
 		prot1 = torch.from_numpy( prot1 )
 		prot2 = torch.tile( prot2, ( eff_len[0], 1 ) )
 
-	return prot1, prot2, target, target_mask
+	return prot1, prot2, target, target_mask, interaction_mask
 
 
 
@@ -357,7 +360,7 @@ def dump_metrics( train, dev, test, time_dict, version, num_metrics, epoch = -1 
 	for key in train.keys():
 		if epochs == None:
 			epochs = train[key].shape[0]
-			num = int( 0.1*epochs ) if epochs > 5 else epochs
+			num = int( 0.2*epochs ) if epochs > 5 else epochs
 			print( num )
 		dif = ( train[key][-num:,0] - dev[key][-num:,0] )/train[key][-num:,0]
 		tmp.append( np.mean( dif )*100 )
