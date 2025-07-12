@@ -730,7 +730,7 @@ class Prediction():
 		Create a binary mask for polar (incuding charged) amino acids.
 		Pad it to max_len.
 		"""
-		polar_aa = ["S", "T", "C", "N", "Q", "Y", "D", "E", "K", "R"]
+		polar_aa = ["S", "T", "C", "N", "Q", "Y", "D", "E", "K", "R", "H"]
 		binary_seq = [int( aa in polar_aa ) for aa in seq]
 		
 		pad_binary_seq = np.zeros( ( self.max_len ) )
