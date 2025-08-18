@@ -682,7 +682,7 @@ class Disobind():
 		if "interface" in self.objective[0]:
 			# af2_pred is laready padded to [100, 100].
 			p1 = np.zeros( ( af2_pred.shape[0], 1 ) )
-			p2 = np.zeros( ( af2_pred.shape[0], 1 ) )
+			p2 = np.zeros( ( af2_pred.shape[1], 1 ) )
 
 			idx = np.where( af2_pred == 1 )
 
