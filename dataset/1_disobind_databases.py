@@ -819,6 +819,7 @@ class The3Muskteers():
 			
 			else:
 				if method == "bio":
+					#OMG missing import of Bio.PDB
 					pdb = PDB.PDBList( server = "ftp://ftp.wwpdb.org" )
 					all_pdbs = pdb.get_all_entries()[1:]
 
@@ -897,6 +898,7 @@ class The3Muskteers():
 
 		disorder = []
 		for uni_id in uniprot_ids:
+			#OMG missing import of find_disorder_regions
 			disorder_regions = find_disorder_regions( self.disprot_path, self.ideal_path, uni_id, min_len = self.min_len )
 			if disorder_regions == []:
 				disorder.append( False )
@@ -968,6 +970,7 @@ class The3Muskteers():
 				with Pool( self.max_cores ) as p:
 					results = p.map( self.filter_PDBs, labelled_pdb )
 			except:
+				#OMG missing import of ProcessPoolExecutor
 				with ProcessPoolExecutor() as executor:
 					complexes = list( executor.map( self.filter_PDBs, labelled_pdb ) )
 			complexes = np.append( complexes, results )

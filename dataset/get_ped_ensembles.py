@@ -161,7 +161,7 @@ class APedsTale():
         """
         if os.path.exists( self.valid_ped_entries_file ):
             with open( self.valid_ped_entries_file, "r" ) as f:
-                ped_ids = f.readlines()[0].( "," )[:-1]
+                ped_ids = f.readlines()[0]( "," )[:-1] #OMG removed "."
         else:
             ped_ids = self.create_ped_ids()
         return ped_ids
@@ -322,6 +322,7 @@ class APedsTale():
         return all( success )
 
 
+    #OMG incorrect return type, change Dict -> Generator[Dict, None, None]
     def get_coordinates_from_pdb( self, pdb_id: str, chain_uni_map:Dict ) -> Dict:
         """
         A generator object that yields a dict containing

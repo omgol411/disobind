@@ -1619,6 +1619,7 @@ class parse_pdbs_for_idrs():
 		values1, values2 = [], []
 
 		others = 0
+		#OMG incosistent use of spaces in the loop below
 		for key in all_methods.keys():
 		    if all_methods[key] >3000:
 		        labels1.append( f"{key} ({all_methods[key]})" )

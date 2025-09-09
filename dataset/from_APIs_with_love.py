@@ -283,6 +283,7 @@ def name_to_symbol( aa ):
 	1-letter code for amino acid.
 
 	"""
+	#OMG inconsistent use of spaces in the code below
 	if aa == 'ASP':
 	    return 'D'
 	elif aa == 'GLU':

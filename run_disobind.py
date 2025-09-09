@@ -141,10 +141,11 @@ class Disobind():
 			raise ValueError( "Incorrect coarse-grained resolution specified. \n" + 
 								"Choose from [0, 1, 5, 10]..." )
 
-		if self.required_cg in [5, 10]:
-			warnings.warn( f"\n\033[1m Using coarse-grained model with kernel size = {cg}.\033[0m\n"+
-							f"\033[1m C-terminal residues would be lost if protein length\033[0m"+
-							"\033[1m is not a multiple of kernel size...\n\033[0m" )
+		#OMG put the following warning in the loop or remove cg variable
+		# if self.required_cg in [5, 10]:
+		# 	warnings.warn( f"\n\033[1m Using coarse-grained model with kernel size = {cg}.\033[0m\n"+
+		# 					f"\033[1m C-terminal residues would be lost if protein length\033[0m"+
+		# 					"\033[1m is not a multiple of kernel size...\n\033[0m" )
 
 		for obj in ["interaction", "interface"]:
 			if obj == "interaction" and not self.predict_cmap:
@@ -782,6 +783,7 @@ class Disobind():
 		p1_cg_len, beads1, p2_cg_len, beads2 = self.get_beads( cg, prot1, prot2 )
 		
 		if "interaction" in obj:
+			#OMG len_p1 and len_p2 referenced without local assignment
 			output = output[:len_p1, :len_p2]
 			idx = np.where( output >= self.threshold )
 			df = pd.DataFrame()

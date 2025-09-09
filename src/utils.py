@@ -245,6 +245,7 @@ def plot_output( pred, target, threshold, file_name, interface = False ):
 			axis[0].set_xlabel( "Predicted_contact_map", fontsize = 16 )
 			axis[1].set_xlabel( "Target_contact_map", fontsize = 16 )
 		else:
+			#OMG cm_dev reference without local assignment
 			x = cm_dev.shape[0] if pred.shape[0] < 8 else 8
 			fig, axis = plt.subplots( x, 2, figsize = ( 20, 22 ) )
 			for i in range( x ):

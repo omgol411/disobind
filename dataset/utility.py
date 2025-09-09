@@ -290,7 +290,8 @@ def ESM_embeddings( emb_type, input_file, output_file ):
 
 			# Extract per-residue representations (on CPU)
 			with torch.no_grad():
-			    results = model( batch_tokens, repr_layers = [33], return_contacts = True )
+				#OMG replace spaces with tabs for the following
+				results = model( batch_tokens, repr_layers = [33], return_contacts = True )
 			token_representations = np.array( results["representations"][33].squeeze( 0 ), dtype = np.float16 )
 			hf.create_dataset(  fasta_header, data = token_representations )
 
@@ -613,6 +614,7 @@ def calculate_disorder_ratio_n_overlap( self, pdb, chain, uniprot_boundary ):
 	overlap --> list of int: overlapping residues in mapping and uniprot position.
 	disorder_ratio --> (float) fraction of disordered residues.
 	"""
+	# missing import of map_pdb_to_uniprot
 	idr_dict, _ = map_pdb_to_uniprot( pdb, chain )
 	overlap, disorder_ratio = [], []
 
@@ -625,7 +627,7 @@ def calculate_disorder_ratio_n_overlap( self, pdb, chain, uniprot_boundary ):
 		
 		overlap.append( _overlap )
 		disorder_ratio.append( _disorder_ratio )
-		
+		#OMG stop not defined
 		print(f"----------: Disordered region {start}-{stop} absent...\n")
 		print(f"Overlap region --> {_overlap} \t Length --> {len( _overlap )}\n")
 		print(f"Disorder ratio --> {_disorder_ratio} \n")

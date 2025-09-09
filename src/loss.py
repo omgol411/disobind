@@ -275,6 +275,7 @@ class TverskyLoss( nn.Module ):
         # True Positives, False Positives & False Negatives
         TP = ( pred * target ).sum()
         FP = ( ( 1 - target ) * pred ).sum()
+        #OMG targets --> target
         FN = ( targets * ( 1 - pred ) ).sum()
 
         alpha, beta = 0.7, 0.7

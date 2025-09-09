@@ -64,6 +64,7 @@ class Trainer (nn.Module):
 			if name == "swa":
 				print( "Using Stochastic Weight Averaging" )
 				self.swa_model = torch.optim.swa_utils.AveragedModel( model )
+				#OMG should be self.scheduler_config
 				self.swa_start = scheduler_config.swa_start
 				self.swa_scheduler = torch.optim.swa_utils.SWALR( optimizer, swa_lr = self.swa_lr )
 			elif name == "cycliclr":

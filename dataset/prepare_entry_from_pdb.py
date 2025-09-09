@@ -273,7 +273,7 @@ class EntryFromPDB():
                     success.append( False )
         return all( success )
 
-
+    #OMG incorrect return type, change Dict -> Generator[Dict, None, None]
     def get_coordinates_from_pdb( self, pdb_id: str, chain_uni_map:Dict ) -> Dict:
         """
         A generator object that yields a dict containing
