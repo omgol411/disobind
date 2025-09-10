@@ -186,7 +186,7 @@ def prepare_input( prot1, prot2, target, target_mask, objective, bin_size, bin_i
 			p1_target_mask = torch.zeros( ( prot1.shape[0], target_mask.shape[1] ) )
 			p1_target_mask[idx_mask[0],idx_mask[1]] = 1
 			
-			p2_target_mask = torch.zeros( ( prot2.shape[0], target_mask.shape[1] ) )
+			p2_target_mask = torch.zeros( ( prot2.shape[0], target_mask.shape[2] ) )
 			p2_target_mask[idx_mask[0],idx_mask[2]] = 1
 			
 			# target: ( N, L1, L2 ) --> ( N, L1+L2 )
